@@ -182,25 +182,38 @@ const affect_procedure = {
 };
 timeline.push(affect_procedure);
 
-
 // ---- 6. 事後評価（おとり1枚＋対象1枚） ----
 const post_evaluation_instructions = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<p>実験はこれで最終段階です。</p><p>最後に、いくつかの作品をもう一度お見せしますので、現在のあなたの第一印象で評価してください。</p>"
+    stimulus: `
+        <p>実験はこれで最終段階です。</p>
+        <p>最後に、いくつかの作品をもう一度お見せしますので、現在のあなたの第一印象で評価してください。</p>
+        <p>準備ができたら、Enterキーを押してください。</p>
+    `
 };
 timeline.push(post_evaluation_instructions);
 
-// おとり刺激を1つ選ぶ（本番ではもっと増やす）
-let decoy_stimulus_path = stimuli_list.find(s => s.image_file !== target_stimulus_path).image_file;
-
-// 事後評価の刺激リスト（おとり＋対象）を作成し、シャッフル
-const post_eval_list = [
-    { image: target_stimulus_path, type: 'target' },
-    { image: decoy_stimulus_path, type: 'decoy' }
-];
-const shuffled_post_eval_list = jsPsych.randomization.shuffle(post_eval_list);
+// ▼▼▼ ここから下が修正箇所 ▼▼▼
 
 const post_evaluation_procedure = {
+    // timeline_variablesを「関数」に変更します
+    timeline_variables: function() {
+        // この関数は、このブロックが始まる瞬間に実行されます
+
+        // 1. おとり刺激を決定する
+        // stimuli_list（全画像リスト）から、ターゲット作品（target_stimulus_path）「以外」の作品を1つ選ぶ
+        let decoy_stimulus = stimuli_list.find(s => s.image_file !== target_stimulus_path);
+
+        // 2. 事後評価リストを作成
+        const post_eval_list = [
+            { image: target_stimulus_path, type: 'target' },
+            { image: decoy_stimulus.image_file, type: 'decoy' }
+        ];
+
+        // 3. リストをシャッフルして返す
+        return jsPsych.randomization.shuffle(post_eval_list);
+    },
+    // timeline自体は変更ありません
     timeline: [
         {
             type: jsPsychImageSliderResponse,
@@ -214,11 +227,11 @@ const post_evaluation_procedure = {
             }
         },
         // （本番ではここに事後評価のSD法も追加します）
-    ],
-    timeline_variables: shuffled_post_eval_list
+    ]
 };
 timeline.push(post_evaluation_procedure);
 
+// ▲▲▲ 修正はここまで ▲▲▲
 
 // ---- 7. デブリーフィングとデータ送信 ----
 const debrief_screen = {
