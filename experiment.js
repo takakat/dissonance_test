@@ -1,13 +1,17 @@
+// ========================================================================
+// experiment.js [最終修正版]
+// ========================================================================
+
 // jsPsychの初期化
 const jsPsych = initJsPsych();
 
 // ========================================================================
-// ▼▼▼ データ保存の設定（重要） ▼▼▼
+// ▼▼▼ データ保存の設定（ここから） ▼▼▼
 // ========================================================================
 function saveData(data){
   // ★★★ 必ず、ご自身のGoogle Apps Scriptの「ウェブアプリのURL」に置き換えてください ★★★
-  const url = "https://script.google.com/macros/s/AKfycbzwIw-rqtvRh3ztjwY51ABupII8AKfgNs2W-JtwEuNUKYx89iXnA4oWc0oOrBE5Fv4AAQ/exec"; 
-  
+  const url = "https://script.google.com/macros/s/AKfycbzwIw-rqtvRh3ztjwY51ABupII8AKfgNs2W-JtwEuNUKYx89iXnA4oWc0oOrBE5Fv4AAQ/exec"; // 例：ご自身のURLに
+
   const options = {
     method: 'POST',
     headers: {
@@ -15,12 +19,12 @@ function saveData(data){
     },
     body: JSON.stringify(data)
   };
-  
+
   // サーバーにデータを送信
   fetch(url, options);
 }
 // ========================================================================
-
+// ▲▲▲ データ保存の設定（ここまで） ▲▲▲
 
 // 実験全体のタイムライン
 let timeline = [];
@@ -31,6 +35,10 @@ const stimuli_list = [
     { image_file: 'stimuli/painting2.jpg' },
     { image_file: 'stimuli/painting3.jpg' }
 ];
+// (本番では、ここを15〜20枚に増やしてください)
+
+// 選定された低評価作品のパスを保存するグローバル変数
+let target_stimulus_path; 
 
 const preload = {
     type: jsPsychPreload,
@@ -81,8 +89,6 @@ timeline.push(screening_procedure);
 
 
 // ---- 3. 低評価作品の選定と事前評価 ----
-let target_stimulus_path; // 選定された低評価作品のパスを保存する変数（グローバルに定義）
-
 const selection_and_baseline = {
     timeline: [
         // 3-1. 低評価作品を自動で選定する
@@ -92,18 +98,17 @@ const selection_and_baseline = {
                 const screening_data = jsPsych.data.get().filter({task: 'screening'});
                 // 最も評価が低かった作品を探す
                 const target_stimulus_data = screening_data.values().reduce((min, p) => p.response < min.response ? p : min);
-
-                // ★★★ この行を修正 ★★★
                 target_stimulus_path = target_stimulus_data.stimulus; // グローバル変数にパスを保存
             }
         },
+        // 3-2. 選定された作品を提示し、詳細な事前評価
         {
             type: jsPsychHtmlKeyboardResponse,
             stimulus: "<p>ありがとうございます。では、次にもう一度だけ作品を見て、より詳しく評価をお願いします。</p>"
         },
         {
             type: jsPsychImageSliderResponse,
-            stimulus: () => target_stimulus_path, // 選定された作品を表示
+            stimulus: () => target_stimulus_path, 
             prompt: "<p>この作品が全体としてどのくらい好きですか？</p>",
             labels: ['全く好きではない', '普通', '極めて好きである'], min: 0, max: 10,
             data: { task: 'pre_evaluation_liking', stimulus: () => target_stimulus_path }
@@ -182,7 +187,8 @@ const affect_procedure = {
 };
 timeline.push(affect_procedure);
 
-// ---- 6. 事後評価（おとり1枚＋対象1枚） ----
+
+// ---- 6. 事後評価（バグ修正済み） ----
 const post_evaluation_instructions = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
@@ -193,52 +199,48 @@ const post_evaluation_instructions = {
 };
 timeline.push(post_evaluation_instructions);
 
-// ▼▼▼ ここから下が修正箇所 ▼▼▼
-
 const post_evaluation_procedure = {
-    // timeline_variablesを「関数」に変更します
+    // timeline_variablesを「関数」に変更
     timeline_variables: function() {
-        
         // この関数は、このブロックが始まる瞬間に実行されます
-        
-        // 1. おとり刺激を決定する
-        // stimuli_list（全画像リスト）から、ターゲット作品（target_stimulus_path）「以外」の作品リストを作成
-        let decoy_options = stimuli_list.filter(s => s.image_file !== target_stimulus_path);
-        
-        // 2. そのおとりリストからランダムに1つ選ぶ
-        let chosen_decoy = jsPsych.randomization.sampleWithoutReplacement(decoy_options, 1)[0];
 
-        // 3. 事後評価リストを作成 (変数名を 'stimulus_path' に統一)
-        const post_eval_list = [
-            { stimulus_path: target_stimulus_path, type: 'target' },
-            { stimulus_path: chosen_decoy.image_file, type: 'decoy' }
-        ];
-        
+        // 1. おとり刺激を決定する
+        let decoy_options = stimuli_list.filter(s => s.image_file !== target_stimulus_path);
+
+        // 2. おとりリストからランダムに1つ選ぶ (もしおとりがなくてもクラッシュしないようにする)
+        let chosen_decoy = decoy_options.length > 0 ? jsPsych.randomization.sampleWithoutReplacement(decoy_options, 1)[0] : null;
+
+        // 3. 事後評価リストを作成
+        let post_eval_list = [];
+        post_eval_list.push({ stimulus_path: target_stimulus_path, type: 'target' });
+
+        if(chosen_decoy){
+            post_eval_list.push({ stimulus_path: chosen_decoy.image_file, type: 'decoy' });
+        }
+
         // 4. リストをシャッフルして返す
         return jsPsych.randomization.shuffle(post_eval_list);
     },
     timeline: [
         {
             type: jsPsychImageSliderResponse,
-            // ★★★ ここで 'stimulus_path' を使うように修正 ★★★
-            stimulus: jsPsych.timelineVariable('stimulus_path'), 
+            stimulus: jsPsych.timelineVariable('stimulus_path'), // 'stimulus_path' を使用
             prompt: "<p>この作品が全体としてどのくらい好きですか？</p>",
             labels: ['全く好きではない', '普通', '極めて好きである'], min: 0, max: 10,
             data: {
                 task: 'post_evaluation_liking',
-                stimulus: jsPsych.timelineVariable('stimulus_path'), // 修正
+                stimulus: jsPsych.timelineVariable('stimulus_path'), 
                 stimulus_type: jsPsych.timelineVariable('type')
             }
         },
-        // （本番ではここに事後評価のSD法も追加します）
+        // (本番ではここに事後評価のSD法も追加します)
     ]
 };
 timeline.push(post_evaluation_procedure);
 
-// ▲▲▲ 修正はここまで ▲▲▲
-// ▲▲▲ 修正はここまで ▲▲▲
 
 // ---- 7. デブリーフィングとデータ送信 ----
+// (データ送信は最後のjsPsych.run()の後で行う)
 const debrief_screen = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
@@ -250,7 +252,8 @@ const debrief_screen = {
 };
 timeline.push(debrief_screen);
 
-// ---- 実験開始 ----
+
+// ---- 実験開始とデータ送信 ----
 jsPsych.run(timeline).then(function() {
     // 全てのデータを取得
     const all_data = jsPsych.data.get().json();
@@ -259,6 +262,5 @@ jsPsych.run(timeline).then(function() {
     saveData(JSON.parse(all_data));
 
     // 参加者向けの最終メッセージ
-    // （本番ではクラウドソーシングの完了コードなどをここに表示します）
     document.body.innerHTML = '<p style="font-size: 20px; padding: 20px;">ご協力ありがとうございました。<br>データは正常に送信されました。<br>このウィンドウを閉じて終了してください。</p>';
 });
