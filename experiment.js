@@ -6,7 +6,7 @@ const jsPsych = initJsPsych();
 // ========================================================================
 function saveData(data){
   // ★★★ 必ず、ご自身のGoogle Apps Scriptの「ウェブアプリのURL」に置き換えてください ★★★
-  const url = "httpsT://script.google.com/macros/s/XXXXXXXXX/exec"; 
+  const url = "https://script.google.com/macros/s/AKfycbzwIw-rqtvRh3ztjwY51ABupII8AKfgNs2W-JtwEuNUKYx89iXnA4oWc0oOrBE5Fv4AAQ/exec"; 
   
   const options = {
     method: 'POST',
@@ -229,15 +229,15 @@ const debrief_screen = {
 };
 timeline.push(debrief_screen);
 
-
 // ---- 実験開始 ----
 jsPsych.run(timeline).then(function() {
     // 全てのデータを取得
     const all_data = jsPsych.data.get().json();
-    
+
     // データをGoogle Apps Scriptに送信
     saveData(JSON.parse(all_data));
-    
+
     // 参加者向けの最終メッセージ
-    document.body.innerHTML = '<p>ご協力ありがとうございました。データは正常に送信されました。このウィンドウを閉じて終了してください。</p>';
+    // （本番ではクラウドソーシングの完了コードなどをここに表示します）
+    document.body.innerHTML = '<p style="font-size: 20px; padding: 20px;">ご協力ありがとうございました。<br>データは正常に送信されました。<br>このウィンドウを閉じて終了してください。</p>';
 });
