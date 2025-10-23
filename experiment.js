@@ -81,17 +81,20 @@ timeline.push(screening_procedure);
 
 
 // ---- 3. 低評価作品の選定と事前評価 ----
-let target_stimulus_path; // 選定された低評価作品のパスを保存する変数
+let target_stimulus_path; // 選定された低評価作品のパスを保存する変数（グローバルに定義）
 
 const selection_and_baseline = {
     timeline: [
+        // 3-1. 低評価作品を自動で選定する
         {
             type: jsPsychCallFunction,
             func: () => {
                 const screening_data = jsPsych.data.get().filter({task: 'screening'});
                 // 最も評価が低かった作品を探す
                 const target_stimulus_data = screening_data.values().reduce((min, p) => p.response < min.response ? p : min);
-                target_stimulus_path = target_stimulus_data.stimulus; // パスを保存
+
+                // ★★★ この行を修正 ★★★
+                target_stimulus_path = target_stimulus_data.stimulus; // グローバル変数にパスを保存
             }
         },
         {
