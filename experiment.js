@@ -198,31 +198,35 @@ timeline.push(post_evaluation_instructions);
 const post_evaluation_procedure = {
     // timeline_variablesを「関数」に変更します
     timeline_variables: function() {
+        
         // この関数は、このブロックが始まる瞬間に実行されます
-
+        
         // 1. おとり刺激を決定する
-        // stimuli_list（全画像リスト）から、ターゲット作品（target_stimulus_path）「以外」の作品を1つ選ぶ
-        let decoy_stimulus = stimuli_list.find(s => s.image_file !== target_stimulus_path);
+        // stimuli_list（全画像リスト）から、ターゲット作品（target_stimulus_path）「以外」の作品リストを作成
+        let decoy_options = stimuli_list.filter(s => s.image_file !== target_stimulus_path);
+        
+        // 2. そのおとりリストからランダムに1つ選ぶ
+        let chosen_decoy = jsPsych.randomization.sampleWithoutReplacement(decoy_options, 1)[0];
 
-        // 2. 事後評価リストを作成
+        // 3. 事後評価リストを作成 (変数名を 'stimulus_path' に統一)
         const post_eval_list = [
-            { image: target_stimulus_path, type: 'target' },
-            { image: decoy_stimulus.image_file, type: 'decoy' }
+            { stimulus_path: target_stimulus_path, type: 'target' },
+            { stimulus_path: chosen_decoy.image_file, type: 'decoy' }
         ];
-
-        // 3. リストをシャッフルして返す
+        
+        // 4. リストをシャッフルして返す
         return jsPsych.randomization.shuffle(post_eval_list);
     },
-    // timeline自体は変更ありません
     timeline: [
         {
             type: jsPsychImageSliderResponse,
-            stimulus: jsPsych.timelineVariable('image'),
+            // ★★★ ここで 'stimulus_path' を使うように修正 ★★★
+            stimulus: jsPsych.timelineVariable('stimulus_path'), 
             prompt: "<p>この作品が全体としてどのくらい好きですか？</p>",
             labels: ['全く好きではない', '普通', '極めて好きである'], min: 0, max: 10,
             data: {
                 task: 'post_evaluation_liking',
-                stimulus: jsPsych.timelineVariable('image'),
+                stimulus: jsPsych.timelineVariable('stimulus_path'), // 修正
                 stimulus_type: jsPsych.timelineVariable('type')
             }
         },
@@ -231,6 +235,7 @@ const post_evaluation_procedure = {
 };
 timeline.push(post_evaluation_procedure);
 
+// ▲▲▲ 修正はここまで ▲▲▲
 // ▲▲▲ 修正はここまで ▲▲▲
 
 // ---- 7. デブリーフィングとデータ送信 ----
