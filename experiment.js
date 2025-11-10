@@ -71,6 +71,24 @@ const imageList = [
   'img/pic4.jpg'
 ];
 
+// SD法の項目定義（例）
+const sdItems = [
+  { left: '醜い', right: '美しい', name: 'sd_beautiful' },
+  { left: 'つまらない', right: '面白い', name: 'sd_interesting' },
+  { left: '嫌い', right: '好き', name: 'sd_like' },
+  { left: '悪い', right: '良い', name: 'sd_good' },
+  { left: '地味な', right: '派手な', name: 'sd_flashy' },
+  { left: '静的', right: '動的', name: 'sd_dynamic' },
+  { left: '不安定な', right: '安定した', name: 'sd_stable' },
+  { left: '平凡な', right: '個性的な', name: 'sd_unique' },
+  { left: '暗い', right: '明るい', name: 'sd_bright' },
+  { left: '冷たい', right: '暖かい', name: 'sd_warm' },
+  { left: '重い', right: '軽い', name: 'sd_light' },
+  { left: '固い', right: '柔らかな', name: 'sd_soft' },
+  { left: '緊張した', right: 'ゆるんだ', name: 'sd_relaxed' },
+  { left: '鈍い', right: '鋭い', name: 'sd_sharp' }
+];
+
 // 3. プリロード
 const preload = {
   type: jsPsychPreload,
@@ -79,16 +97,70 @@ const preload = {
 
 // 4. スライダー評価（1回目）のテンプレート
 const sliderTrial = {
-  type: jsPsychImageSliderResponse,
-  stimulus: jsPsych.timelineVariable('image_path'),
-  labels: ['全くそう思わない', 'どちらでもない', '非常にそう思う'],
-  min: 0,
-  max: 100,
-  slider_start: 50,
-  require_movement: true,
-  prompt: '<p>この画像を見て、どの程度「美しい」と感じますか？</p>',
+  type: jsPsychSurveyHtmlForm, // ★プラグインを変更
+  
+  html: function() {
+    // 現在の試行の画像パスを取得
+    const imgPath = jsPsych.timelineVariable('image_path');
+    
+    // SD法のスライダーHTMLを生成
+    let slidersHTML = '';
+    sdItems.forEach(item => {
+      slidersHTML += `
+        <div class="sd-item">
+          <span class="sd-label left">${item.left}</span>
+          <input type="range" name="${item.name}" min="0" max="100" value="50" class="sd-slider" required>
+          <span class="sd-label right">${item.right}</span>
+        </div>
+      `;
+    });
+
+    // 全体のHTMLを返す
+    return `
+      <style>
+        .container { display: flex; max-width: 900px; margin: 0 auto; gap: 40px; text-align: left; }
+        .left-col { flex: 1; position: sticky; top: 20px; height: fit-content; }
+        .right-col { flex: 1.5; display: flex; flex-direction: column; gap: 30px; padding-top: 20px; }
+        .sticky-image { width: 100%; height: auto; border: 1px solid #ccc; }
+        
+        /* SD法スライダー用のCSS */
+        .sd-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .sd-label { flex: 1; text-align: center; font-size: 14px; }
+        .sd-label.left { text-align: right; }
+        .sd-label.right { text-align: left; }
+        .sd-slider { flex: 3; margin: 0 15px; }
+      </style>
+
+      <div class="container">
+        <div class="left-col">
+          <img src="${imgPath}" class="sticky-image">
+        </div>
+        <div class="right-col">
+          <p>この作品についての印象を、各スケールでお答えください。</p>
+          ${slidersHTML}
+        </div>
+      </div>
+    `;
+  },
+  button_label: '次へ',
   data: {
-    task: 'rating' // 1回目の評価
+    task: 'rating',
+    image_path: jsPsych.timelineVariable('image_path')
+  },
+  on_finish: function(data) {
+    // jsPsychSurveyHtmlFormは回答を data.response という1つのオブジェクトにまとめるので、
+    // 分析しやすいように、個別のカラムに展開して保存し直す（任意だが推奨）
+    
+    // data.response = { sd_bright: "75", sd_warm: "20", ... }
+    const responses = data.response;
+    
+    // スコアを数値に変換して、データプロパティのトップレベルに追加
+    data.sd_bright = Number(responses.sd_bright);
+    data.sd_warm = Number(responses.sd_warm);
+    data.sd_beautiful = Number(responses.sd_beautiful);
+    
+    // 以前のコードとの互換性のため、'美しい'のスコアを 'response' にも入れておく
+    data.response = Number(responses.sd_beautiful);
   }
 };
 
@@ -106,24 +178,34 @@ let writingTargetImage = '';
 let writingTargetScore = 0;
 
 const writingTrial = {
-  type: jsPsychHtmlForm, // ★ jsPsychHtmlForm を使用
+  type: jsPsychSurveyHtmlForm,
   
   html: function() {
-    // 最低評価の画像を探す
-    const ratingData = jsPsych.data.get().filter({task: 'rating'});
+    // 評価データの取得方法を修正
+    const ratingData = jsPsych.data.get().filter({task: 'rating'}).values();
     let lowestTrial = null;
-    ratingData.values().forEach(trial => {
-      if (lowestTrial === null || trial.response < lowestTrial.response) {
-        lowestTrial = trial;
+    let lowestScore = Infinity;
+
+    // 各試行のデータを確認
+    ratingData.forEach(trial => {
+      // sd_beautiful の値を使用して比較
+      if (trial.sd_beautiful < lowestScore) {
+        lowestScore = trial.sd_beautiful;
+        lowestTrial = {
+          stimulus: trial.image_path,// 画像パスを保存
+          response: trial.sd_beautiful // 美しさの評価を保存
+        };
       }
     });
 
-    if (lowestTrial) {
-      writingTargetImage = lowestTrial.stimulus;
-      writingTargetScore = lowestTrial.response;
-    } else {
+    // データが見つからない場合のエラーハンドリング
+    if (!lowestTrial) {
+      console.error('評価データが見つかりません');
       writingTargetImage = 'N/A';
       writingTargetScore = 'N/A';
+    } else {
+      writingTargetImage = lowestTrial.stimulus;
+      writingTargetScore = lowestTrial.response;
     }
 
     // 2カラムレイアウトのHTMLを返す
