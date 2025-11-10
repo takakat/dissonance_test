@@ -1,266 +1,259 @@
-// ========================================================================
-// experiment.js [最終修正版]
-// ========================================================================
-
-// jsPsychの初期化
-const jsPsych = initJsPsych();
-
-// ========================================================================
-// ▼▼▼ データ保存の設定（ここから） ▼▼▼
-// ========================================================================
-function saveData(data){
-  // ★★★ 必ず、ご自身のGoogle Apps Scriptの「ウェブアプリのURL」に置き換えてください ★★★
-  const url = "https://script.google.com/macros/s/AKfycbzwIw-rqtvRh3ztjwY51ABupII8AKfgNs2W-JtwEuNUKYx89iXnA4oWc0oOrBE5Fv4AAQ/exec"; // 例：ご自身のURLに
-
-  const options = {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data)
-  };
-
-  // サーバーにデータを送信
-  fetch(url, options);
-}
-// ========================================================================
-// ▲▲▲ データ保存の設定（ここまで） ▲▲▲
-
-// 実験全体のタイムライン
-let timeline = [];
-
-// ---- 0. 刺激リストと画像の事前読み込み ----
-const stimuli_list = [
-    { image_file: 'stimuli/painting1.jpg' },
-    { image_file: 'stimuli/painting2.jpg' },
-    { image_file: 'stimuli/painting3.jpg' }
-];
-// (本番では、ここを15〜20枚に増やしてください)
-
-// 選定された低評価作品のパスを保存するグローバル変数
-let target_stimulus_path; 
-
-const preload = {
-    type: jsPsychPreload,
-    images: stimuli_list.map(s => s.image_file),
-    auto_preload: true
-};
-timeline.push(preload);
+// ★★★ ステップ1でコピーしたGASのURLを貼り付ける ★★★
+// (ご自身のGASのURLに書き換えてください)
+const scriptURL = 'https://script.google.com/macros/s/AKfycbzwIw-rqtvRh3ztjwY51ABupII8AKfgNs2W-JtwEuNUKYx89iXnA4oWc0oOrBE5Fv4AAQ/exec';
 
 
-// ---- 1. 同意取得 ----
-const consent_screen = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-        <p>研究へのご協力ありがとうございます。</p>
-        <p>（ここに同意説明文を記述します）</p>
-        <p>準備ができたら、Enterキーを押して開始してください。</p>
-    `
-};
-timeline.push(consent_screen);
+// 1. jsPsychの初期化
+const jsPsych = initJsPsych({
+  on_finish: function() {
+    
+    // (A) 参加者の画面を「保存中」にする
+    document.body.innerHTML = `
+      <div style="width: 80%; max-width: 600px; margin: 100px auto; text-align: center; line-height: 1.6;">
+        <h2>データを保存しています...</h2>
+        <p>このページを閉じずに、しばらくお待ちください。</p>
+      </div>
+    `;
 
+    // (B) 送信するデータを準備する
+    jsPsych.data.addProperties({
+      participant_id: participantID
+    });
+    
+    const allData = jsPsych.data.get(); 
+    const dataToSend = {
+      participant_id: participantID,
+      experiment_data: allData.values() 
+    };
 
-// ---- 2. 事前スクリーニング ----
-const screening_instructions = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<p>これから、いくつかの絵画を順番に見ていただきます。</p><p>それぞれの絵画が全体としてどのくらい好きか、直感でお答えください。</p>"
-};
-timeline.push(screening_instructions);
-
-const screening_procedure = {
-    timeline: [
-        {
-            type: jsPsychImageSliderResponse,
-            stimulus: jsPsych.timelineVariable('image_file'),
-            labels: ['全く好きではない', '普通', '極めて好きである'],
-            min: 0,
-            max: 10,
-            prompt: "<p>この作品が全体としてどのくらい好きですか？</p>",
-            data: {
-                task: 'screening',
-                stimulus: jsPsych.timelineVariable('image_file')
-            }
-        }
-    ],
-    timeline_variables: stimuli_list,
-    randomize_order: true
-};
-timeline.push(screening_procedure);
-
-
-// ---- 3. 低評価作品の選定と事前評価 ----
-const selection_and_baseline = {
-    timeline: [
-        // 3-1. 低評価作品を自動で選定する
-        {
-            type: jsPsychCallFunction,
-            func: () => {
-                const screening_data = jsPsych.data.get().filter({task: 'screening'});
-                // 最も評価が低かった作品を探す
-                const target_stimulus_data = screening_data.values().reduce((min, p) => p.response < min.response ? p : min);
-                target_stimulus_path = target_stimulus_data.stimulus; // グローバル変数にパスを保存
-            }
-        },
-        // 3-2. 選定された作品を提示し、詳細な事前評価
-        {
-            type: jsPsychHtmlKeyboardResponse,
-            stimulus: "<p>ありがとうございます。では、次にもう一度だけ作品を見て、より詳しく評価をお願いします。</p>"
-        },
-        {
-            type: jsPsychImageSliderResponse,
-            stimulus: () => target_stimulus_path, 
-            prompt: "<p>この作品が全体としてどのくらい好きですか？</p>",
-            labels: ['全く好きではない', '普通', '極めて好きである'], min: 0, max: 10,
-            data: { task: 'pre_evaluation_liking', stimulus: () => target_stimulus_path }
-        },
-        {
-            type: jsPsychSurveyLikert,
-            preamble: () => `<img src="${target_stimulus_path}" width="400px"><p>この作品の印象についてお答えください。</p>`,
-            questions: [
-                { prompt: "美しい - 醜い", name: 'SD_beautiful_ugly', labels: ['1', '2', '3', '4', '5', '6', '7'] },
-                { prompt: "好き - 嫌い", name: 'SD_like_dislike', labels: ['1', '2', '3', '4', '5', '6', '7'] }
-                // （本番ではここにSD法の項目を全て追加します）
-            ],
-            data: { task: 'pre_evaluation_sd', stimulus: () => target_stimulus_path }
-        }
-    ]
-};
-timeline.push(selection_and_baseline);
-
-
-// ---- 4. ランダム割り当てと介入 ----
-const group = jsPsych.randomization.sampleWithoutReplacement(['A', 'B', 'C'], 1)[0];
-
-const intervention_instructions = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<p>次に、文章を作成する課題に取り組んでいただきます。課題はシステムが自動で割り当てます。</p>"
-};
-timeline.push(intervention_instructions);
-
-const intervention_A = {
-    type: jsPsychSurveyText,
-    questions: [{
-        prompt: () => `<img src="${target_stimulus_path}" width="400px"><p><strong>【課題A】</strong>この作品の魅力を推薦する文章を作成してください。</p>`,
-        rows: 8, columns: 60, name: 'writing_task'
-    }],
-    data: { task: 'intervention', group: 'A' }
-};
-
-const intervention_B = {
-    type: jsPsychSurveyText,
-    questions: [{
-        prompt: () => `<img src="${target_stimulus_path}" width="400px"><p><strong>【課題B】</strong>この作品を客観的に解説する文章を作成してください。</p>`,
-        rows: 8, columns: 60, name: 'writing_task'
-    }],
-    data: { task: 'intervention', group: 'B' }
-};
-
-const intervention_C = {
-    type: jsPsychSurveyText,
-    questions: [{
-        prompt: `<p><strong>【課題C】</strong>あなたが最近読んだ本や観た映画のあらすじを要約してください。</p>`,
-        rows: 8, columns: 60, name: 'writing_task'
-    }],
-    data: { task: 'intervention', group: 'C' }
-};
-
-// 条件分岐で各群の課題を実行
-timeline.push({ timeline: [intervention_A], conditional_function: () => group === 'A' });
-timeline.push({ timeline: [intervention_B], conditional_function: () => group === 'B' });
-timeline.push({ timeline: [intervention_C], conditional_function: () => group === 'C' });
-
-
-// ---- 5. 感情評価（A, B群のみ） ----
-const affect_check = {
-    type: jsPsychSurveyLikert,
-    questions: [
-        { prompt: "課題に取り組んでいる間、「不快感」を感じましたか？", name: 'affect_discomfort', labels: ['全く感じなかった', '少し', 'ある程度', 'かなり', '非常に強く感じた'] },
-        { prompt: "課題に取り組んでいる間、「楽しさ」を感じましたか？", name: 'affect_fun', labels: ['全く感じなかった', '少し', 'ある程度', 'かなり', '非常に強く感じた'] },
-    ],
-    data: { task: 'affect_check' },
-    randomize_question_order: true
-};
-
-const affect_procedure = {
-    timeline: [affect_check],
-    conditional_function: () => group === 'A' || group === 'B'
-};
-timeline.push(affect_procedure);
-
-
-// ---- 6. 事後評価（バグ修正済み） ----
-const post_evaluation_instructions = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-        <p>実験はこれで最終段階です。</p>
-        <p>最後に、いくつかの作品をもう一度お見せしますので、現在のあなたの第一印象で評価してください。</p>
-        <p>準備ができたら、Enterキーを押してください。</p>
-    `
-};
-timeline.push(post_evaluation_instructions);
-
-const post_evaluation_procedure = {
-    // timeline_variablesを「関数」に変更
-    timeline_variables: function() {
-        // この関数は、このブロックが始まる瞬間に実行されます
-
-        // 1. おとり刺激を決定する
-        let decoy_options = stimuli_list.filter(s => s.image_file !== target_stimulus_path);
-
-        // 2. おとりリストからランダムに1つ選ぶ (もしおとりがなくてもクラッシュしないようにする)
-        let chosen_decoy = decoy_options.length > 0 ? jsPsych.randomization.sampleWithoutReplacement(decoy_options, 1)[0] : null;
-
-        // 3. 事後評価リストを作成
-        let post_eval_list = [];
-        post_eval_list.push({ stimulus_path: target_stimulus_path, type: 'target' });
-
-        if(chosen_decoy){
-            post_eval_list.push({ stimulus_path: chosen_decoy.image_file, type: 'decoy' });
-        }
-
-        // 4. リストをシャッフルして返す
-        return jsPsych.randomization.shuffle(post_eval_list);
-    },
-    timeline: [
-        {
-            type: jsPsychImageSliderResponse,
-            stimulus: jsPsych.timelineVariable('stimulus_path'), // 'stimulus_path' を使用
-            prompt: "<p>この作品が全体としてどのくらい好きですか？</p>",
-            labels: ['全く好きではない', '普通', '極めて好きである'], min: 0, max: 10,
-            data: {
-                task: 'post_evaluation_liking',
-                stimulus: jsPsych.timelineVariable('stimulus_path'), 
-                stimulus_type: jsPsych.timelineVariable('type')
-            }
-        },
-        // (本番ではここに事後評価のSD法も追加します)
-    ]
-};
-timeline.push(post_evaluation_procedure);
-
-
-// ---- 7. デブリーフィングとデータ送信 ----
-// (データ送信は最後のjsPsych.run()の後で行う)
-const debrief_screen = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-        <p>ご協力ありがとうございました。</p>
-        <p>（ここに実験の真の目的を説明するデブリーフィング文を記述します）</p>
-        <p><b>データは自動的に送信されます。</b></p>
-        <p>Enterキーを押して実験を終了してください。</p>
-    `
-};
-timeline.push(debrief_screen);
-
-
-// ---- 実験開始とデータ送信 ----
-jsPsych.run(timeline).then(function() {
-    // 全てのデータを取得
-    const all_data = jsPsych.data.get().json();
-
-    // データをGoogle Apps Scriptに送信
-    saveData(JSON.parse(all_data));
-
-    // 参加者向けの最終メッセージ
-    document.body.innerHTML = '<p style="font-size: 20px; padding: 20px;">ご協力ありがとうございました。<br>データは正常に送信されました。<br>このウィンドウを閉じて終了してください。</p>';
+    // (C) fetch API でデータをPOST送信する
+    fetch(scriptURL, {
+      method: 'POST',
+      mode: 'no-cors', 
+      body: JSON.stringify(dataToSend)
+    })
+    .then(response => {
+      // (D) 送信成功時の処理
+      document.body.innerHTML = `
+        <div style="width: 80%; max-width: 600px; margin: 100px auto; text-align: center; line-height: 1.6;">
+          <h2>実験は終了です。</h2>
+          <p>ご協力ありがとうございました。</p>
+          <p>このウィンドウを閉じて構いません。</p>
+        </div>
+      `;
+    })
+    .catch(error => {
+      // (E) 送信失敗時の処理（バックアップ）
+      console.error('Error sending data:', error);
+      document.body.innerHTML = `
+        <div style="width: 80%; max-width: 600px; margin: 100px auto; text-align: center; line-height: 1.6;">
+          <h2>データの送信エラー</h2>
+          <p>申し訳ありませんが、データの自動送信に失敗しました。</p>
+          <p>お手数ですが、以下のテキストボックスの内容をすべてコピーし、実験実施者にお送りください。</p>
+          <textarea style="width: 100%; height: 200px; margin-top: 20px;"></textarea>
+          <p>コピーが完了したら、このウィンドウを閉じてください。</p>
+        </div>
+      `;
+      document.querySelector('textarea').value = jsPsych.data.get().csv();
+    });
+  }
 });
+
+// 参加者IDの生成
+const participantID = jsPsych.randomization.randomID(10);
+
+
+// 2. 画像リスト
+const imageList = [
+  'img/pic1.jpg',
+  'img/pic2.jpg',
+  'img/pic3.jpg',
+  'img/pic4.jpg'
+];
+
+// 3. プリロード
+const preload = {
+  type: jsPsychPreload,
+  images: imageList
+};
+
+// 4. スライダー評価（1回目）のテンプレート
+const sliderTrial = {
+  type: jsPsychImageSliderResponse,
+  stimulus: jsPsych.timelineVariable('image_path'),
+  labels: ['全くそう思わない', 'どちらでもない', '非常にそう思う'],
+  min: 0,
+  max: 100,
+  slider_start: 50,
+  require_movement: true,
+  prompt: '<p>この画像を見て、どの程度「美しい」と感じますか？</p>',
+  data: {
+    task: 'rating' // 1回目の評価
+  }
+};
+
+// 5. 1回目の評価ループ
+const trials = {
+  timeline: [sliderTrial],
+  timeline_variables: imageList.map(img => {
+    return { image_path: img };
+  }),
+  randomize_order: true
+};
+
+// 6. ライティング課題（2カラム・スクロール追従）
+let writingTargetImage = '';
+let writingTargetScore = 0;
+
+const writingTrial = {
+  type: jsPsychHtmlForm, // ★ jsPsychHtmlForm を使用
+  
+  html: function() {
+    // 最低評価の画像を探す
+    const ratingData = jsPsych.data.get().filter({task: 'rating'});
+    let lowestTrial = null;
+    ratingData.values().forEach(trial => {
+      if (lowestTrial === null || trial.response < lowestTrial.response) {
+        lowestTrial = trial;
+      }
+    });
+
+    if (lowestTrial) {
+      writingTargetImage = lowestTrial.stimulus;
+      writingTargetScore = lowestTrial.response;
+    } else {
+      writingTargetImage = 'N/A';
+      writingTargetScore = 'N/A';
+    }
+
+    // 2カラムレイアウトのHTMLを返す
+    return `
+      <style>
+        .container {
+          display: flex;
+          max-width: 900px;
+          margin: 0 auto;
+          gap: 40px;
+          text-align: left;
+        }
+        .left-col {
+          flex: 1;
+          position: sticky; /* ★スクロール追従 */
+          top: 20px;
+          height: fit-content;
+        }
+        .right-col {
+          flex: 1.5;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+        .sticky-image {
+          width: 100%;
+          height: auto;
+          border: 1px solid #ccc;
+          box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+        }
+        label {
+          font-weight: bold;
+          display: block;
+          margin-bottom: 8px;
+        }
+        textarea, input[type="text"] {
+          width: 100%;
+          padding: 8px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          box-sizing: border-box; /* パディングを含めた幅にする */
+        }
+      </style>
+
+      <div class="container">
+        <div class="left-col">
+          <p>あなたが最も低く評価した作品（評価：${writingTargetScore}）</p>
+          <img src="${writingTargetImage}" class="sticky-image">
+        </div>
+
+        <div class="right-col">
+          <h3>以下の質問にお答えください</h3>
+          
+          <div>
+            <label for="q1">1. この作品のどこが最も気になりましたか？</label>
+            <textarea id="q1" name="q1_concern" rows="6" required></textarea>
+          </div>
+
+          <div>
+            <label for="q2">2. もしあなたが作者なら、どの色を変更しますか？</label>
+            <textarea id="q2" name="q2_color_change" rows="4"></textarea>
+          </div>
+
+          <div>
+            <label for="q3">3. この作品にタイトルをつけるとしたら？</label>
+            <input type="text" id="q3" name="q3_title_suggestion">
+          </div>
+
+           <div style="height: 400px; background: #f9f9f9; padding: 20px; border-radius: 8px;">
+             <label>4. （その他の質問...）</label>
+             <p>ここにさらに多くの質問が並び、画面が縦に長くなっても、左側の絵画は常に画面内に留まります。</p>
+           </div>
+
+        </div>
+      </div>
+    `;
+  },
+  button_label: '回答を送信する',
+  data: function() {
+    return {
+      task: 'writing',
+      target_image: writingTargetImage,
+      target_score: writingTargetScore
+    };
+  }
+};
+
+// 7. 再評価前の説明文
+const reratingInstruction = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: `
+    <div style="max-width: 600px; margin: auto; line-height: 1.6;">
+      <p>アンケートへのご回答、ありがとうございました。</p>
+      <p>最後に、もう一度すべての作品を評価していただきます。</p>
+      <br>
+      <p>準備ができたら、何かキーを押して開始してください。</p>
+    </div>
+  `
+};
+
+// 8. スライダー評価（2回目・再評価）のテンプレート
+const reratingTrial = {
+  type: jsPsychImageSliderResponse,
+  stimulus: jsPsych.timelineVariable('image_path'),
+  labels: ['全くそう思わない', 'どちらでもない', '非常にそう思う'],
+  min: 0,
+  max: 100,
+  slider_start: 50,
+  require_movement: true,
+  prompt: '<p><b>(再評価)</b> この画像を見て、どの程度「美しい」と感じますか？</p>',
+  data: {
+    task: 'rerating' // 2回目の評価
+  }
+};
+
+// 9. 2回目の評価ループ
+const trials_rerating = {
+  timeline: [reratingTrial],
+  timeline_variables: imageList.map(img => {
+    return { image_path: img };
+  }),
+  randomize_order: true
+};
+
+
+// 10. 実験の実行
+jsPsych.run([
+  preload,
+  trials,
+  writingTrial,
+  reratingInstruction,
+  trials_rerating
+]);
