@@ -1,82 +1,73 @@
 // =========================================================
-// experiment.js : Final Step (完成版)
+// experiment.js : 上下分割・画像固定レイアウト版
 // =========================================================
 
 const jsPsych = initJsPsych({
-    on_finish: function() {
-        // 実験終了時にCSVをダウンロード（ローカル保存）
-        // ※本番時はここを削除し、DataPipeのみにします
-        jsPsych.data.get().localSave('csv', 'dissonance_experiment_data.csv');
-    }
+    on_finish: function() { }
 });
 
-// ★DataPipe ID (本番用IDをここに入れる)
-const DATAPIPE_ID = ""; 
-
+const DATAPIPE_ID = "FSbN2d1AkLUZ"; 
 let timeline = [];
 
 // ---------------------------------------------------------
-// 1. 設定・変数定義
+// 1. 設定
 // ---------------------------------------------------------
 
-// 画像ファイルリスト (imgフォルダ内)
+// 絵画データ（各絵画に個別のCSSクラスを割り当て可能）
 const stimuli_data = [
-    { id: 'art_1', path: 'img/painting_05.jpg' },
-    { id: 'art_2', path: 'img/painting_06.jpg' },
-    { id: 'art_3', path: 'img/painting_07.jpg' }
+    { id: 'art_1', path: 'img/painting_01.jpg', cssClass: 'img-art-1' },
+    { id: 'art_2', path: 'img/painting_02.jpg', cssClass: 'img-art-2' },
+    { id: 'art_3', path: 'img/painting_03.jpg', cssClass: 'img-art-3' }
 ];
 const preload_images = stimuli_data.map(data => data.path);
 
-// SD法尺度 (事前・事後共通)
-const sd_scale = [
-    { prompt: "醜い - 美しい", name: "beauty", labels: ["醜い", "2", "3", "4", "5", "6", "美しい"] },
-    { prompt: "嫌い - 好き",   name: "like",   labels: ["嫌い", "2", "3", "4", "5", "6", "好き"] },
-    { prompt: "悪い - 良い",   name: "good",   labels: ["悪い", "2", "3", "4", "5", "6", "良い"] },
-    { prompt: "つまらない - 面白い", name: "interest", labels: ["つまらない", "2", "3", "4", "5", "6", "面白い"] }
+// SD法尺度
+const sd_scale_source = [
+    { prompt: "醜い - 美しい",   name: "beauty",   labels: ["醜い", "2", "3", "4", "5", "6", "美しい"] },
+    { prompt: "嫌い - 好き",     name: "like",     labels: ["嫌い", "2", "3", "4", "5", "6", "好き"] },
+    { prompt: "悪い - 良い",     name: "good",     labels: ["悪い", "2", "3", "4", "5", "6", "良い"] },
+    { prompt: "つまらない - 面白い", name: "interest", labels: ["つまらない", "2", "3", "4", "5", "6", "面白い"] },
+    { prompt: "静的 - 動的",     name: "dynamic",  labels: ["静的", "2", "3", "4", "5", "6", "動的"] },
+    { prompt: "弱い - 強い",     name: "strong",   labels: ["弱い", "2", "3", "4", "5", "6", "強い"] },
+    { prompt: "地味な - 派手な", name: "showy",    labels: ["地味な", "2", "3", "4", "5", "6", "派手な"] },
+    { prompt: "暗い - 明るい",   name: "bright",   labels: ["暗い", "2", "3", "4", "5", "6", "明るい"] },
+    { prompt: "寂しい - 楽しい", name: "fun",      labels: ["寂しい", "2", "3", "4", "5", "6", "楽しい"] },
+    { prompt: "冷たい - 暖かい", name: "warm",     labels: ["冷たい", "2", "3", "4", "5", "6", "暖かい"] },
+    { prompt: "固い - 柔らかな", name: "soft",     labels: ["固い", "2", "3", "4", "5", "6", "柔らかな"] },
+    { prompt: "緊張した - ゆるんだ", name: "loose", labels: ["緊張した", "2", "3", "4", "5", "6", "ゆるんだ"] }
 ];
+const sd_scale = jsPsych.randomization.shuffle(sd_scale_source);
 
-// 事後評価で追加する質問「推奨意図」
-const recommend_scale = [
-    { prompt: "この作品を友人に勧めたいですか？", name: "recommend", labels: ["全く勧めない", "2", "3", "4", "5", "6", "強く勧める"] }
-];
-
-// 操作チェック用質問 (不快感・葛藤)
 const manipulation_check_scale = [
-    { prompt: "先ほどの文章作成課題を行っている時、「書きにくい」「不快だ」といった葛藤を感じましたか？", 
-      name: "discomfort", 
-      labels: ["全く感じなかった", "2", "3", "4", "5", "6", "強く感じた"] }
+    { prompt: "文章作成課題中、「書きにくい」「不快だ」といった葛藤を感じましたか？", name: "discomfort", labels: ["全く感じなかった", "2", "3", "4", "5", "6", "強く感じた"] }
 ];
 
-// 状態管理変数
-let TARGET_DATA = { id: null, path: null, score: 100 };
-let CONDITION = null; // 'A'(Positive), 'B'(Objective), 'C'(Control)
+let TARGET_DATA = { id: null, path: null, score: 100, cssClass: null };
+let CONDITION = null; 
 
 // ---------------------------------------------------------
-// 2. 初期化 (Preload & Assignment)
+// 2. 初期化
 // ---------------------------------------------------------
 timeline.push({
     type: jsPsychPreload,
     images: preload_images,
-    message: '実験データを読み込み中...'
+    message: 'Loading...'
 });
 
-// 参加者ID生成
 const subject_id = jsPsych.randomization.randomID(10);
 jsPsych.data.addProperties({subject_id: subject_id});
 
-// 群割り当て (本来はDataPipeで行うが、簡易的にランダム生成)
 timeline.push({
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: '準備中...',
+    stimulus: 'Loading...',
     trial_duration: 500,
     on_finish: function() {
         const r = Math.random();
         if (r < 0.33) CONDITION = 'A';
         else if (r < 0.66) CONDITION = 'B';
         else CONDITION = 'C';
-        
         jsPsych.data.addProperties({ condition: CONDITION });
-        console.log("Assigned Condition:", CONDITION);
+        console.log("Condition:", CONDITION);
     }
 });
 
@@ -88,27 +79,32 @@ timeline.push({
     stimulus: `
         <div class="instruction-text">
             <h3>事前評価</h3>
-            <p>これから表示される絵画の印象を直感的に評価してください。</p>
-            <p>スペースキーで開始</p>
+            <p>上部に表示される絵画を見ながら、下部の項目について直感的に評価してください。</p>
+            <p>絵画は画面上部に常に表示されています。</p>
+            <p>評価項目が多い場合は、下部をスクロールして回答してください。</p>
+            <p><strong>スペースキーで開始</strong></p>
         </div>
-    `
+    `,
+    choices: [' ']
 });
 
 const pre_evaluation_loop = {
     timeline: [{
         type: jsPsychSurveyLikert,
+        css_classes: ['split-layout'],
+        
         preamble: function() {
             const p = jsPsych.evaluateTimelineVariable('path');
-            return `<img src="${p}" style="width:400px; margin-bottom:10px;">`;
+            const cssClass = jsPsych.evaluateTimelineVariable('cssClass');
+            return `<img src="${p}" class="fixed-img ${cssClass}">`;
         },
         questions: sd_scale,
-        scale_width: 600,
+        scale_width: 700,
+        randomize_question_order: false,
         on_finish: function(data) {
-            // スコア計算
-            const vals = Object.values(data.response);
-            let sum = 0; for(let v of vals) sum += v;
-            
-            data.phase = 'pre'; // ★事前データであることをタグ付け
+            const res = data.response;
+            let sum = (res.beauty||0) + (res.like||0) + (res.good||0) + (res.interest||0);
+            data.phase = 'pre'; 
             data.eval_score = sum / 4;
             data.img_id = jsPsych.evaluateTimelineVariable('id');
             data.img_path = jsPsych.evaluateTimelineVariable('path');
@@ -124,12 +120,10 @@ timeline.push(pre_evaluation_loop);
 // ---------------------------------------------------------
 timeline.push({
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: 'データ処理中...',
+    stimulus: 'Processing...',
     trial_duration: 500,
     on_finish: function() {
-        // 事前評価データだけを抽出
         const all_data = jsPsych.data.get().filter({phase: 'pre'}).values();
-        // スコアが低い順にソート
         all_data.sort((a, b) => a.eval_score - b.eval_score);
         
         if(all_data.length > 0){
@@ -137,63 +131,59 @@ timeline.push({
             TARGET_DATA.path = all_data[0].img_path;
             TARGET_DATA.score = all_data[0].eval_score;
             
-            // 分析用にターゲット情報を全データに付与
+            const targetStimulus = stimuli_data.find(s => s.id === TARGET_DATA.id);
+            if(targetStimulus) {
+                TARGET_DATA.cssClass = targetStimulus.cssClass;
+            }
+            
             jsPsych.data.addProperties({ target_id: TARGET_DATA.id });
+            console.log("Target selected:", TARGET_DATA);
         }
     }
 });
 
 // ---------------------------------------------------------
-// 5. Phase 2: 介入 (Writing Task)
+// 5. Phase 2: 介入 (記述課題)
 // ---------------------------------------------------------
 timeline.push({
     type: jsPsychSurveyText,
     preamble: function() {
-        let html = `<div style="margin-bottom: 20px;">`;
-        
-        // C群以外はターゲット画像を表示
+        let html = `<div style="text-align:center; padding:20px;">`;
         if (CONDITION !== 'C') {
-            html += `<img src="${TARGET_DATA.path}" style="width:350px; border:1px solid #ccc;"><br>`;
+            const imgClass = TARGET_DATA.cssClass || '';
+            html += `<img src="${TARGET_DATA.path}" class="fixed-img ${imgClass}" style="max-width:600px; max-height:400px; margin:0 auto 25px; display:block;"><br>`;
         }
+        html += `<h3 style="margin-top:15px; font-size:24px;">記述課題</h3>`;
         
-        html += `<h3 style="margin-top:15px;">記述課題</h3>`;
-        
-        if (CONDITION === 'A') { // 肯定
-            html += `<p style="color:#0056b3; font-weight:bold;">この作品の「良い点・魅力的な点」を3つ挙げ、<br>友人に推薦する文章を書いてください。</p>`;
-            html += `<p style="font-size:0.9em;">※自分がこの作品をとても気に入っているつもりで書いてください。</p>`;
-        } 
-        else if (CONDITION === 'B') { // 客観
-            html += `<p style="color:#333; font-weight:bold;">この作品の「色使い・構図・描かれている対象」について、<br>客観的に解説する文章を書いてください。</p>`;
-            html += `<p style="font-size:0.9em;">※個人的な感情は入れず、事実のみを記述してください。</p>`;
-        } 
-        else { // C: 統制
-            html += `<div style="text-align:left; background:#f9f9f9; padding:10px; font-size:0.9em;">
-                <p><strong>課題文:</strong> 生成AIの発展はクリエイティブ領域に変革をもたらし...</p>
-            </div>`;
-            html += `<p>上記の文章を要約してください。</p>`;
+        if (CONDITION === 'A') { 
+            html += `<p style="color:#0056b3; font-weight:bold; max-width:700px; margin:15px auto; font-size:17px; line-height:1.7;">この作品の「良い点・魅力的な点」を3つ挙げ、<br>友人に推薦する文章を書いてください。</p>`;
+        } else if (CONDITION === 'B') { 
+            html += `<p style="color:#333; font-weight:bold; max-width:700px; margin:15px auto; font-size:17px; line-height:1.7;">この作品の「色使い・構図・描かれている対象」について、<br>客観的に解説する文章を書いてください。</p>`;
+        } else { 
+            html += `<div style="text-align:left; background:#f9f9f9; padding:20px; font-size:15px; max-width:750px; margin:15px auto; border-radius:8px; border:1px solid #ddd;">
+                <p><strong>課題文:</strong> 生成AIの発展は...</p>
+            </div><p style="margin-top:20px; font-size:16px;">上記の文章を要約してください。</p>`;
         }
         html += `</div>`;
         return html;
     },
-    questions: [{ prompt: "", rows: 5, columns: 50, required: true, name: 'essay' }],
+    questions: [{ prompt: "", rows: 8, columns: 80, required: true, name: 'essay' }],
     button_label: '送信',
     on_finish: function(data) { data.phase = 'intervention'; }
 });
 
 // ---------------------------------------------------------
-// 6. Phase 3: 操作チェック (A/B群のみ)
+// 6. Phase 3: 操作チェック
 // ---------------------------------------------------------
 const manip_check = {
     timeline: [{
         type: jsPsychSurveyLikert,
-        preamble: '今の課題についてお伺いします。',
+        preamble: '<h3 style="text-align:center; margin-bottom:30px; font-size:22px;">今の課題についてお伺いします</h3>',
         questions: manipulation_check_scale,
+        scale_width: 700,
         on_finish: function(data) { data.phase = 'manipulation_check'; }
     }],
-    conditional_function: function() {
-        // C群の場合はスキップ
-        return CONDITION !== 'C';
-    }
+    conditional_function: function() { return CONDITION !== 'C'; }
 };
 timeline.push(manip_check);
 
@@ -205,47 +195,55 @@ timeline.push({
     stimulus: `
         <div class="instruction-text">
             <h3>事後評価</h3>
-            <p>最後に、もう一度いくつかの絵画についてお伺いします。</p>
-            <p>今のあなたの率直な印象を回答してください。</p>
-            <p>スペースキーで開始</p>
+            <p>もう一度、上部の絵画を見ながら印象を評価してください。</p>
+            <p>絵画は画面上部に常に表示されています。</p>
+            <p>下部をスクロールして全ての項目に回答してください。</p>
+            <p><strong>スペースキーで開始</strong></p>
         </div>
-    `
+    `,
+    choices: [' ']
 });
 
 const post_evaluation_loop = {
     timeline: [{
         type: jsPsychSurveyLikert,
+        css_classes: ['split-layout'],
+        
         preamble: function() {
             const p = jsPsych.evaluateTimelineVariable('path');
-            return `<img src="${p}" style="width:400px; margin-bottom:10px;">`;
+            const cssClass = jsPsych.evaluateTimelineVariable('cssClass');
+            return `<img src="${p}" class="fixed-img ${cssClass}">`;
         },
-        // SD法 + 推奨意図(recommend_scale) を結合して提示
-        questions: sd_scale.concat(recommend_scale), 
-        scale_width: 600,
+        questions: sd_scale,
+        scale_width: 700,
+        randomize_question_order: false,
         on_finish: function(data) {
-            // スコア計算 (SD法部分のみ)
             const res = data.response;
-            // beauty, like, good, interest の4つを合計
-            let sum = (res.beauty || 0) + (res.like || 0) + (res.good || 0) + (res.interest || 0);
-            
-            data.phase = 'post'; // ★事後データ
+            let sum = (res.beauty||0) + (res.like||0) + (res.good||0) + (res.interest||0);
+            data.phase = 'post'; 
             data.eval_score = sum / 4;
             data.img_id = jsPsych.evaluateTimelineVariable('id');
-            
-            // ターゲット画像かどうかを記録（分析時に超便利）
             data.is_target = (data.img_id === TARGET_DATA.id);
         }
     }],
-    timeline_variables: stimuli_data, // 事前と同じ画像セットを使う
+    timeline_variables: stimuli_data, 
     randomize_order: true
 };
 timeline.push(post_evaluation_loop);
 
 // ---------------------------------------------------------
-// 8. デブリーフィング & 終了
+// 8. 終了
 // ---------------------------------------------------------
+const save_data_trial = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: '<p style="text-align:center; font-size:20px; margin-top:50px;">データを保存しています...</p>',
+    trial_duration: 1000, 
+    on_finish: function() {
+        jsPsych.data.get().localSave('csv', 'dissonance_experiment_data.csv');
+    }
+};
+timeline.push(save_data_trial);
 
-// DataPipe送信 (IDがある場合のみ)
 if(DATAPIPE_ID !== "") {
     timeline.push({
         type: jsPsychPipe,
@@ -256,37 +254,18 @@ if(DATAPIPE_ID !== "") {
     });
 }
 
-
-// ★修正: データを保存するための専用トライアルを追加
-const save_data_trial = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: '<p style="font-size:24px;">データを保存しています...</p>',
-    trial_duration: 1000, // 1秒間表示
-    on_finish: function() {
-        // ここでCSVダウンロードを実行
-        jsPsych.data.get().localSave('csv', 'dissonance_experiment_data.csv');
-    }
-};
-timeline.push(save_data_trial);
-
-
-// 最後の画面
 const debriefing = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: `
         <div class="instruction-text">
-            <h3>実験終了：ご協力ありがとうございました</h3>
-            <p><strong>研究の目的について</strong><br>
-            事前説明では「言語表現の研究」とお伝えしましたが、実際には「自分の好みと異なる文章を書くことで、その対象への評価がどう変化するか（認知的不協和）」を調査する実験でした。</p>
-            <p>意図的な隠蔽があったことをお詫び申し上げます。</p>
-            <hr>
-            <p style="color: red; font-weight: bold;">※自動的にデータ(CSVファイル)がダウンロードされます。</p>
-            <p>ダウンロードを確認できたら、ブラウザを閉じて終了してください。</p>
+            <h3>実験終了</h3>
+            <p>ご協力ありがとうございました。</p>
+            <p>データは正常に保存されました。</p>
+            <p><strong>ブラウザを閉じて終了してください。</strong></p>
         </div>
     `,
-    choices: "NO_KEYS" // ここで止まる
+    choices: "NO_KEYS" 
 };
 timeline.push(debriefing);
 
-// 実行
 jsPsych.run(timeline);

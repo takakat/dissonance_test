@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>評価実験 Step 3</title>
+  <title>反態度的弁護 実験 (レイアウト修正版)</title>
   
   <script src="https://unpkg.com/jspsych@8.0.2"></script>
   <link rel="stylesheet" href="https://unpkg.com/jspsych@8.0.2/css/jspsych.css">
@@ -15,12 +15,240 @@
   <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe@0.4.0"></script>
 
   <style>
-      body { font-family: 'Noto Sans JP', sans-serif; color: #333; }
-      .instruction-text { max-width: 800px; margin: 50px auto; text-align: left; line-height: 1.6; }
-      .jspsych-survey-likert-statement { font-size: 18px; margin-bottom: 10px; font-weight: bold; }
+      body { 
+          font-family: 'Noto Sans JP', sans-serif; 
+          color: #333; 
+          margin: 0;
+          overflow: hidden; /* ページ全体のスクロールを無効化 */
+      }
       
-      /* 記述エリアのスタイル調整 */
-      textarea { font-size: 16px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+      /* --- 上下分割レイアウト用の設定 --- */
+      
+      /* 画面全体を上下2分割 */
+      .split-layout .jspsych-content-wrapper {
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100vh !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+      }
+
+      .split-layout .jspsych-content {
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100% !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+      }
+
+      /* 上部：画像エリア（固定・スクロールなし） */
+      .split-layout .jspsych-survey-likert-preamble {
+          flex: 0 0 50vh !important; /* 画面高さの50%を固定で使用 */
+          height: 50vh !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 20px !important;
+          background: #f5f5f5 !important;
+          border-bottom: 3px solid #ddd !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          overflow: hidden !important;
+          box-sizing: border-box !important;
+      }
+
+      /* 下部：フォームエリア（スクロール可能） */
+      .split-layout form {
+          flex: 1 1 auto !important;
+          height: 50vh !important;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 30px 50px 50px !important;
+          overflow-y: auto !important; /* 縦スクロールを有効化 */
+          overflow-x: hidden !important;
+          box-sizing: border-box !important;
+          background: #ffffff !important;
+      }
+
+      /* 画像のスタイル */
+      .fixed-img {
+          max-width: 90% !important;
+          max-height: 90% !important;
+          width: auto !important;
+          height: auto !important;
+          display: block !important;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+          border-radius: 8px;
+          object-fit: contain;
+      }
+
+      /* 個別に絵画サイズを指定（必要に応じて） */
+      .img-art-1 { max-width: 600px !important; max-height: 45vh !important; }
+      .img-art-2 { max-width: 700px !important; max-height: 45vh !important; }
+      .img-art-3 { max-width: 650px !important; max-height: 45vh !important; }
+
+      /* SD法の質問項目エリア */
+      .split-layout .jspsych-survey-likert-question {
+          margin-bottom: 40px !important;
+          padding-bottom: 25px !important;
+          border-bottom: 1px solid #e0e0e0;
+      }
+
+      .split-layout .jspsych-survey-likert-question:last-of-type {
+          border-bottom: none;
+          margin-bottom: 20px !important;
+      }
+
+      /* 質問文のスタイル */
+      .jspsych-survey-likert-statement { 
+          font-size: 18px !important;
+          margin-bottom: 15px !important;
+          font-weight: bold !important;
+          color: #333 !important;
+          display: block !important;
+      }
+      
+      /* スケールバー全体のコンテナ */
+      .split-layout .jspsych-survey-likert-opts { 
+          display: table !important;
+          table-layout: fixed !important;
+          width: 100% !important;
+          max-width: 650px !important;
+          margin: 0 auto !important;
+          padding: 10px 0 !important;
+          border-spacing: 0 !important;
+      }
+
+      /* 各選択肢（ラベル要素） */
+      .split-layout .jspsych-survey-likert-opts > label {
+          display: table-cell !important;
+          text-align: center !important;
+          vertical-align: middle !important;
+          width: auto !important;
+          padding: 0 5px !important;
+      }
+
+      /* 選択肢内の要素を縦並びに */
+      .split-layout .jspsych-survey-likert-opt-label { 
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 8px !important;
+      }
+
+      /* ラジオボタン */
+      .split-layout input[type="radio"] {
+          transform: scale(1.5) !important;
+          cursor: pointer !important;
+          margin: 5px 0 !important;
+      }
+
+      /* ラベルテキスト */
+      .split-layout .jspsych-survey-likert-opt-label > span {
+          font-size: 13px !important;
+          color: #666 !important;
+          text-align: center !important;
+          display: block !important;
+          line-height: 1.3 !important;
+      }
+
+      /* 送信ボタン */
+      .split-layout button.jspsych-btn {
+          margin: 30px auto 0 !important;
+          padding: 15px 60px !important;
+          font-size: 18px !important;
+          background-color: #0066cc !important;
+          color: white !important;
+          border: none !important;
+          border-radius: 8px !important;
+          cursor: pointer !important;
+          transition: background-color 0.3s !important;
+          display: block !important;
+      }
+
+      .split-layout button.jspsych-btn:hover {
+          background-color: #0052a3 !important;
+      }
+
+      /* インストラクション用のスタイル */
+      .instruction-text {
+          text-align: center;
+          max-width: 900px;
+          margin: 50px auto;
+          padding: 50px;
+          background: #f8f9fa;
+          border-radius: 12px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      }
+
+      .instruction-text h3 {
+          font-size: 28px;
+          margin-bottom: 25px;
+          color: #0066cc;
+      }
+
+      .instruction-text p {
+          font-size: 17px;
+          line-height: 1.9;
+          margin: 15px 0;
+      }
+
+      /* スクロールバーのカスタマイズ */
+      .split-layout form::-webkit-scrollbar {
+          width: 12px;
+      }
+
+      .split-layout form::-webkit-scrollbar-track {
+          background: #f1f1f1;
+      }
+
+      .split-layout form::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 6px;
+      }
+
+      .split-layout form::-webkit-scrollbar-thumb:hover {
+          background: #555;
+      }
+
+      /* タブレット対応 */
+      @media (max-width: 1024px) {
+          .split-layout form {
+              padding: 25px 30px 40px !important;
+          }
+
+          .jspsych-survey-likert-opts {
+              max-width: 90% !important;
+          }
+      }
+
+      /* 小さい画面での警告 */
+      @media (max-width: 900px) {
+          body::before {
+              content: "⚠ このタスクは11インチ以上のモニターでの参加が必要です";
+              display: block;
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100%;
+              background: #ff6b6b;
+              color: white;
+              text-align: center;
+              padding: 12px;
+              z-index: 9999;
+              font-weight: bold;
+              font-size: 14px;
+          }
+
+          .split-layout .jspsych-survey-likert-preamble {
+              padding-top: 60px !important;
+          }
+      }
   </style>
 </head>
 <body></body>
