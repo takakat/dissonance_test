@@ -24,23 +24,75 @@ const stimuli_data = [
 const preload_images = stimuli_data.map(data => data.path);
 
 // SD法尺度 (定義後シャッフル)
+// SD法尺度 (定義後シャッフル)
 const sd_scale_source = [
     // [評価性]
-    { prompt: "醜い - 美しい",   name: "beauty",   labels: ["醜い", "2", "3", "4", "5", "6", "美しい"] },
-    { prompt: "嫌い - 好き",     name: "like",     labels: ["嫌い", "2", "3", "4", "5", "6", "好き"] },
-    { prompt: "悪い - 良い",     name: "good",     labels: ["悪い", "2", "3", "4", "5", "6", "良い"] },
-    { prompt: "つまらない - 面白い", name: "interest", labels: ["つまらない", "2", "3", "4", "5", "6", "面白い"] },
+    { 
+        prompt: "醜い - 美しい", 
+        name: "beauty",   
+        labels: ["醜い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "美しい"] 
+    },
+    { 
+        prompt: "嫌い - 好き",     
+        name: "like",     
+        labels: ["嫌い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "好き"] 
+    },
+    { 
+        prompt: "悪い - 良い",     
+        name: "good",     
+        labels: ["悪い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "良い"] 
+    },
+    { 
+        prompt: "つまらない - 面白い", 
+        name: "interest", 
+        labels: ["つまらない", "1", "2", "3", "4", "5", "6", "7", "8", "9", "面白い"] 
+    },
+
     // [活動性]
-    { prompt: "静的 - 動的",     name: "dynamic",  labels: ["静的", "2", "3", "4", "5", "6", "動的"] },
-    { prompt: "弱い - 強い",     name: "strong",   labels: ["弱い", "2", "3", "4", "5", "6", "強い"] },
-    { prompt: "地味な - 派手な", name: "showy",    labels: ["地味な", "2", "3", "4", "5", "6", "派手な"] },
+    { 
+        prompt: "静的 - 動的",     
+        name: "dynamic",  
+        labels: ["静的", "1", "2", "3", "4", "5", "6", "7", "8", "9", "動的"] 
+    },
+    { 
+        prompt: "弱い - 強い",     
+        name: "strong",   
+        labels: ["弱い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "強い"] 
+    },
+    { 
+        prompt: "地味な - 派手な", 
+        name: "showy",    
+        labels: ["地味な", "1", "2", "3", "4", "5", "6", "7", "8", "9", "派手な"] 
+    },
+
     // [明るさ]
-    { prompt: "暗い - 明るい",   name: "bright",   labels: ["暗い", "2", "3", "4", "5", "6", "明るい"] },
-    { prompt: "寂しい - 楽しい", name: "fun",      labels: ["寂しい", "2", "3", "4", "5", "6", "楽しい"] },
-    { prompt: "冷たい - 暖かい", name: "warm",     labels: ["冷たい", "2", "3", "4", "5", "6", "暖かい"] },
+    { 
+        prompt: "暗い - 明るい",   
+        name: "bright",   
+        labels: ["暗い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "明るい"] 
+    },
+    { 
+        prompt: "寂しい - 楽しい", 
+        name: "fun",      
+        labels: ["寂しい", "1", "2", "3", "4", "5", "6", "7", "8", "9", "楽しい"] 
+    },
+    { 
+        prompt: "冷たい - 暖かい", 
+        name: "warm",     
+        labels: ["冷たい", "1", "2", "3", "4", "5", "6", "7", "8", "9", "暖かい"] 
+    },
+
     // [やわらかさ]
-    { prompt: "固い - 柔らかな", name: "soft",     labels: ["固い", "2", "3", "4", "5", "6", "柔らかな"] },
-    { prompt: "緊張した - ゆるんだ", name: "loose", labels: ["緊張した", "2", "3", "4", "5", "6", "ゆるんだ"] }
+    { 
+        prompt: "固い - 柔らかな", 
+        name: "soft",     
+        labels: ["固い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "柔らかな"] 
+    },
+    { 
+        prompt: "緊張した - ゆるんだ", 
+        name: "loose", 
+        labels: ["緊張した", "1", "2", "3", "4", "5", "6", "7", "8", "9", "ゆるんだ"] 
+    }
 ];
 const sd_scale = jsPsych.randomization.shuffle(sd_scale_source);
 
@@ -63,8 +115,16 @@ timeline.push({
     message: 'データを読み込み中...'
 });
 
+// 参加者ID
 const subject_id = jsPsych.randomization.randomID(10);
-jsPsych.data.addProperties({subject_id: subject_id});
+
+// ★完了コード生成
+const completion_code = jsPsych.randomization.randomID(8).toUpperCase();
+
+jsPsych.data.addProperties({
+    subject_id: subject_id,
+    completion_code: completion_code 
+});
 
 // 群割り当て
 timeline.push({
@@ -268,17 +328,32 @@ if(DATAPIPE_ID !== "") {
 // ★ここが復元したデブリーフィングです
 const debriefing = {
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: `
-        <div class="instruction-text">
-            <h3>実験終了：ご協力ありがとうございました</h3>
-            <p><strong>研究の目的について</strong><br>
-            事前説明では「言語表現と思考プロセスの研究」とお伝えしましたが、実際には「自分の好みと異なる文章を書くことで、その対象への評価がどう変化するか（認知的不協和理論）」を調査する実験でした。</p>
-            <p>正確な結果を得るため、意図的な隠蔽（カバーストーリーの使用）があったことをお詫び申し上げます。</p>
-            <hr>
-            <p style="color: red; font-weight: bold;">※自動的にデータ(CSVファイル)がダウンロードされます。</p>
-            <p>ダウンロードを確認できたら、ブラウザを閉じて終了してください。</p>
-        </div>
-    `,
+    stimulus: function() {
+        return `
+            <div class="instruction-text">
+                <h3>実験終了：ご協力ありがとうございました</h3>
+                <p><strong>研究の目的について</strong><br>
+                事前説明では「言語表現と思考プロセスの研究」とお伝えしましたが、実際には「自分の好みと異なる文章を書くことで、その対象への評価がどう変化するか（認知的不協和理論）」を調査する実験でした。<br>
+                正確な結果を得るため、意図的な隠蔽（カバーストーリーの使用）があったことをお詫び申し上げます。</p>
+                
+                <hr style="border: 2px solid #333; margin: 30px 0;">
+                
+                <div style="background-color: #f0f8ff; padding: 20px; border: 2px solid #0056b3; border-radius: 8px; text-align: center;">
+                    <p style="font-weight: bold; font-size: 18px; margin-bottom: 10px;">実験完了コード</p>
+                    <p style="font-size: 36px; font-weight: bold; letter-spacing: 3px; color: #d32f2f; background: #fff; display: inline-block; padding: 5px 20px; border: 1px solid #ccc; user-select: all;">
+                        ${completion_code}
+                    </p>
+                    <p style="font-size: 14px; margin-top: 10px;">
+                        上記のコードを必ず<strong>コピー、またはメモ</strong>をしてください。<br>
+                        <br>
+                        コードを記録しましたら、ブラウザを閉じて終了してください。
+                    </p>
+                </div>
+
+                <p style="margin-top: 30px;">※自動的にデータ(CSV)がダウンロードされます。</p>
+            </div>
+        `;
+    },
     choices: "NO_KEYS" 
 };
 timeline.push(debriefing);
