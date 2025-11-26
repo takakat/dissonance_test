@@ -96,12 +96,23 @@ const sd_scale_source = [
 ];
 const sd_scale = jsPsych.randomization.shuffle(sd_scale_source);
 
-// 操作チェック
-const manipulation_check_scale = [
-    { prompt: "先ほどの文章作成課題を行っている時、「書きにくい」「不快だ」といった葛藤を感じましたか？", 
-      name: "discomfort", 
-      labels: ["全く感じなかった", "2", "3", "4", "5", "6", "強く感じた"] }
+// ★修正: 感情・不協和測定用尺度 (8項目)
+// 日本語訳を当て、7段階で測定します。
+const manipulation_check_source = [
+    // Positive
+    { prompt: "幸せな", name: "happy", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
+    { prompt: "気分が良い", name: "good_mood", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
+    { prompt: "楽観的な", name: "optimistic", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
+    { prompt: "親しみを感じる", name: "friendly", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
+    { prompt: "活気に満ちた", name: "energetic", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
+    
+    // Negative (Dissonance)
+    { prompt: "居心地が悪い", name: "uncomfortable", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
+    { prompt: "落ち着かない", name: "uneasy", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
+    { prompt: "煩わしい", name: "bothered", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] }
 ];
+// 順序効果を防ぐためシャッフル
+const manipulation_check_scale = jsPsych.randomization.shuffle(manipulation_check_source);
 
 let TARGET_DATA = { id: null, path: null, score: 100 };
 let CONDITION = null; 
@@ -256,7 +267,7 @@ const manip_check = {
         questions: manipulation_check_scale,
         on_finish: function(data) { data.phase = 'manipulation_check'; }
     }],
-    conditional_function: function() { return CONDITION !== 'C'; }
+   // conditional_function: function() { return CONDITION !== 'C'; }
 };
 timeline.push(manip_check);
 
