@@ -94,7 +94,8 @@ const sd_scale_source = [
         labels: ["緊張した", "1", "2", "3", "4", "5", "6", "7", "8", "9", "ゆるんだ"] 
     }
 ];
-const sd_scale = jsPsych.randomization.shuffle(sd_scale_source);
+// 通常項目の順序をシャッフルして固定
+const sd_scale_fixed = jsPsych.randomization.shuffle(sd_scale_source);
 
 // ★修正: 感情・不協和測定用尺度 (8項目)
 // 日本語訳を当て、7段階で測定します。
@@ -114,8 +115,25 @@ const manipulation_check_source = [
 // 順序効果を防ぐためシャッフル
 const manipulation_check_scale = jsPsych.randomization.shuffle(manipulation_check_source);
 
+// ★追加: 混入させるアテンションチェック項目
+const attention_check_item = {
+    // 目立つように色を変えるか、あるいは自然にするかは研究意図次第ですが、
+    // ここでは「指示に従うか」を見るため、太字で指示します。
+    prompt: "<span font-weight:bold;'>【確認】この項目では一番左（1の左隣）を選んでください</span>",
+    name: "attention_check",
+    labels: ["これを選択", "1", "2", "3", "4", "5", "6", "7", "8", "9", "不可"]
+};
+
 let TARGET_DATA = { id: null, path: null, score: 100 };
 let CONDITION = null; 
+
+// ★アテンションチェックを入れる対象の画像をランダムに決定
+// 事前・事後それぞれで1枚ずつ選ぶ
+const pre_check_target_id = jsPsych.randomization.sampleWithoutReplacement(stimuli_data.map(s => s.id), 1)[0];
+const post_check_target_id = jsPsych.randomization.sampleWithoutReplacement(stimuli_data.map(s => s.id), 1)[0];
+
+console.log(`Pre-check target: ${pre_check_target_id}`);
+console.log(`Post-check target: ${post_check_target_id}`);
 
 // ---------------------------------------------------------
 // 2. 初期化
@@ -132,9 +150,13 @@ const subject_id = jsPsych.randomization.randomID(10);
 // ★完了コード生成
 const completion_code = jsPsych.randomization.randomID(8).toUpperCase();
 
+
+
 jsPsych.data.addProperties({
     subject_id: subject_id,
-    completion_code: completion_code 
+    completion_code: completion_code ,
+    pre_check_target_id: pre_check_target_id,   // どの画像でチェックしたか記録
+    post_check_target_id: post_check_target_id
 });
 
 // 群割り当て
@@ -151,6 +173,77 @@ timeline.push({
         console.log("Condition:", CONDITION);
     }
 });
+
+
+
+
+// =========================================================
+// 0. 同意画面 (Consent Form)
+// =========================================================
+
+// ★後でここに同意文をコピペしてください
+const consent_text_content = `
+    <p><strong>研究参加への同意</strong></p>
+    <p>本研究は、言語表現と思考プロセスに関する心理学的実験です。</p>
+    <p><strong>【実験の手順】</strong><br>
+    画面の指示に従い、画像の評価や文章の作成を行っていただきます。<br>
+    </p>
+    <p><strong>【匿名性の保持】</strong><br>
+    収集されたデータは統計的に処理され、個人が特定されることはありません。</p>
+    <p><strong>【参加の自由】</strong><br>
+    本実験への参加は任意です。実験途中であっても、ブラウザを閉じることでいつでも不利益なく参加を中止できます。</p>
+    <p>ここに説明文</p>
+`;
+
+const consent_trial = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: function() {
+        return `
+            <div class="instruction-text" style="max-width: 800px; margin: 0 auto;">
+                <h3>実験参加への同意</h3>
+                
+                <div style="border: 1px solid #ccc; padding: 20px; height: 300px; overflow-y: scroll; background: #fff; text-align: left; margin-bottom: 20px; border-radius: 4px;">
+                    ${consent_text_content}
+                </div>
+
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <label style="font-size: 1.2em; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                        <input type="checkbox" id="consent_checkbox" style="transform: scale(1.5);">
+                        <span>上記の内容を理解し、実験参加に同意します。</span>
+                    </label>
+                </div>
+            </div>
+        `;
+    },
+    choices: ['実験を開始する'],
+    // 画面が表示された直後の処理
+    on_load: function() {
+        // 1. 開始ボタンを取得
+        const btn = document.querySelector('.jspsych-btn');
+        
+        // 2. 最初はボタンを押せないようにする（無効化）
+        btn.disabled = true;
+        btn.style.opacity = "0.5"; // 薄くして押せない感を出す
+
+        // 3. チェックボックスの動作を監視
+        const checkbox = document.getElementById('consent_checkbox');
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                // チェックされたらボタンを有効化
+                btn.disabled = false;
+                btn.style.opacity = "1";
+            } else {
+                // チェックが外れたらまた無効化
+                btn.disabled = true;
+                btn.style.opacity = "0.5";
+            }
+        });
+    }
+};
+
+// タイムラインの最初に追加
+timeline.push(consent_trial);
+
 
 // ---------------------------------------------------------
 // 3. Phase 1: 事前評価
@@ -170,22 +263,46 @@ timeline.push({
 const pre_evaluation_loop = {
     timeline: [{
         type: jsPsychSurveyLikert,
-        // ★ここに「上下固定レイアウト」のクラスを適用
         css_classes: ['sticky-top-layout'],
         
         preamble: function() {
             const p = jsPsych.evaluateTimelineVariable('path');
             return `<img src="${p}" class="fixed-img">`;
         },
-        questions: sd_scale,
-        scale_width: 600,
+        
+        // ★ここで動的に質問リストを生成する
+        questions: function() {
+            const current_id = jsPsych.evaluateTimelineVariable('id');
+            
+            // 通常の尺度（シャッフル済みの固定順序）をコピー
+            let current_questions = [...sd_scale_fixed];
+
+            // もし「チェック対象の画像」だったら、チェック項目を混ぜる
+            if (current_id === pre_check_target_id) {
+                // ランダムな位置（0〜12番目）にチェック項目を挿入
+                const insert_index = Math.floor(Math.random() * (current_questions.length + 1));
+                current_questions.splice(insert_index, 0, attention_check_item);
+            }
+            
+            return current_questions;
+        },
+        
+        scale_width: 800,
         on_finish: function(data) {
             const res = data.response;
+            // 通常項目の合計スコアを計算（チェック項目は無視）
             let sum = (res.beauty||0) + (res.like||0) + (res.good||0) + (res.interest||0);
-            data.phase = 'pre'; 
+            
+            data.phase = 'pre';
             data.eval_score = sum / 4;
             data.img_id = jsPsych.evaluateTimelineVariable('id');
             data.img_path = jsPsych.evaluateTimelineVariable('path');
+            
+            // チェック項目が含まれていた場合、正解したかどうかも記録しておくと便利
+            if (res.attention_check !== undefined) {
+                // 一番左（index 0）が正解
+                data.passed_check = (res.attention_check === 0);
+            }
         }
     }],
     timeline_variables: stimuli_data,
@@ -289,22 +406,41 @@ timeline.push({
 const post_evaluation_loop = {
     timeline: [{
         type: jsPsychSurveyLikert,
-        // ★ここも「上下固定レイアウト」
         css_classes: ['sticky-top-layout'],
         
         preamble: function() {
             const p = jsPsych.evaluateTimelineVariable('path');
             return `<img src="${p}" class="fixed-img">`;
         },
-        questions: sd_scale,
-        scale_width: 600,
+        
+        // ★事後も同様に動的に質問を生成
+        questions: function() {
+            const current_id = jsPsych.evaluateTimelineVariable('id');
+            let current_questions = [...sd_scale_fixed]; // コピー
+
+            // 事後チェック対象の画像なら、チェック項目を混ぜる
+            if (current_id === post_check_target_id) {
+                const insert_index = Math.floor(Math.random() * (current_questions.length + 1));
+                current_questions.splice(insert_index, 0, attention_check_item);
+            }
+            
+            return current_questions;
+        },
+        
+        scale_width: 800,
         on_finish: function(data) {
             const res = data.response;
             let sum = (res.beauty||0) + (res.like||0) + (res.good||0) + (res.interest||0);
+            
             data.phase = 'post'; 
             data.eval_score = sum / 4;
             data.img_id = jsPsych.evaluateTimelineVariable('id');
             data.is_target = (data.img_id === TARGET_DATA.id);
+            
+            // 事後チェック項目の正誤記録
+            if (res.attention_check !== undefined) {
+                data.passed_check = (res.attention_check === 0);
+            }
         }
     }],
     timeline_variables: stimuli_data, 
@@ -316,12 +452,28 @@ timeline.push(post_evaluation_loop);
 // 8. 終了処理（デブリーフィング復元）
 // ---------------------------------------------------------
 
+// 削除する列のリスト
+const ignore_columns = [
+    'stimulus', 
+    'question_order', 
+    'success', 
+    'timeout', 
+    'failed_images', 
+    'failed_audio', 
+    'failed_video', 
+    'plugin_version', 
+    'internal_node_id', 
+    'trial_type'
+];
+
 const save_data_trial = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus: '<p style="font-size:24px;">データを保存しています...</p>',
     trial_duration: 1000, 
     on_finish: function() {
-        jsPsych.data.get().localSave('csv', 'dissonance_experiment_data.csv');
+       jsPsych.data.get()
+            .ignore(ignore_columns)
+            .localSave('csv', 'dissonance_experiment_data.csv');
     }
 };
 timeline.push(save_data_trial);
@@ -332,7 +484,7 @@ if(DATAPIPE_ID !== "") {
         action: "save",
         experiment_id: DATAPIPE_ID,
         filename: `${subject_id}.csv`,
-        data_string: ()=>jsPsych.data.get().csv()
+        data_string: ()=>jsPsych.data.get().ignore(ignore_columns).csv()
     });
 }
 
