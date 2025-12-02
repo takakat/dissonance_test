@@ -23,105 +23,75 @@ const stimuli_data = [
 ];
 const preload_images = stimuli_data.map(data => data.path);
 
+// ★追加: 保存する列の順番をここで定義（固定）します
+const sd_keys = [
+    "beauty", "like", "good", "interest", // 評価性
+    "dynamic", "strong", "showy",         // 活動性
+    "bright", "fun", "warm",              // 明るさ
+    "soft", "loose",                      // やわらかさ
+    "attention_check"                     // アテンションチェック
+];
+
+const manip_keys = [
+    "happy", "good_mood", "optimistic", "friendly", "energetic", // Positive
+    "uncomfortable", "uneasy", "bothered"                        // Negative
+];
+
 // SD法尺度 (定義後シャッフル)
-// SD法尺度 (定義後シャッフル)
+// 0と10の下に改行(<br>)を入れて形容詞を表示し、文字サイズを少し小さくします
+function create_labels(left_text, right_text) {
+    const style = "font-size: 0.8em; font-weight: normal; display: block; margin-top: 5px;";
+    return [
+        `0<br><span style="${style}">${left_text}</span>`,
+        "1", "2", "3", "4", "5", "6", "7", "8", "9",
+        `10<br><span style="${style}">${right_text}</span>`
+    ];
+}
+
+// SD法尺度 (11段階)
+// プロンプトはシンプルにし、ラベル側で意味を提示します
 const sd_scale_source = [
     // [評価性]
-    { 
-        prompt: "醜い - 美しい", 
-        name: "beauty",   
-        labels: ["醜い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "美しい"] 
-    },
-    { 
-        prompt: "嫌い - 好き",     
-        name: "like",     
-        labels: ["嫌い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "好き"] 
-    },
-    { 
-        prompt: "悪い - 良い",     
-        name: "good",     
-        labels: ["悪い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "良い"] 
-    },
-    { 
-        prompt: "つまらない - 面白い", 
-        name: "interest", 
-        labels: ["つまらない", "1", "2", "3", "4", "5", "6", "7", "8", "9", "面白い"] 
-    },
-
+    { prompt: "醜い - 美しい", name: "beauty", labels: create_labels("醜い", "美しい") },
+    { prompt: "嫌い - 好き",   name: "like",   labels: create_labels("嫌い", "好き") },
+    { prompt: "悪い - 良い",   name: "good",   labels: create_labels("悪い", "良い") },
+    { prompt: "つまらない - 面白い", name: "interest", labels: create_labels("つまらない", "面白い") },
     // [活動性]
-    { 
-        prompt: "静的 - 動的",     
-        name: "dynamic",  
-        labels: ["静的", "1", "2", "3", "4", "5", "6", "7", "8", "9", "動的"] 
-    },
-    { 
-        prompt: "弱い - 強い",     
-        name: "strong",   
-        labels: ["弱い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "強い"] 
-    },
-    { 
-        prompt: "地味な - 派手な", 
-        name: "showy",    
-        labels: ["地味な", "1", "2", "3", "4", "5", "6", "7", "8", "9", "派手な"] 
-    },
-
+    { prompt: "静的 - 動的",   name: "dynamic", labels: create_labels("静的", "動的") },
+    { prompt: "弱い - 強い",   name: "strong",  labels: create_labels("弱い", "強い") },
+    { prompt: "地味な - 派手な", name: "showy", labels: create_labels("地味な", "派手な") },
     // [明るさ]
-    { 
-        prompt: "暗い - 明るい",   
-        name: "bright",   
-        labels: ["暗い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "明るい"] 
-    },
-    { 
-        prompt: "寂しい - 楽しい", 
-        name: "fun",      
-        labels: ["寂しい", "1", "2", "3", "4", "5", "6", "7", "8", "9", "楽しい"] 
-    },
-    { 
-        prompt: "冷たい - 暖かい", 
-        name: "warm",     
-        labels: ["冷たい", "1", "2", "3", "4", "5", "6", "7", "8", "9", "暖かい"] 
-    },
-
+    { prompt: "暗い - 明るい", name: "bright", labels: create_labels("暗い", "明るい") },
+    { prompt: "寂しい - 楽しい", name: "fun",   labels: create_labels("寂しい", "楽しい") },
+    { prompt: "冷たい - 暖かい", name: "warm",  labels: create_labels("冷たい", "暖かい") },
     // [やわらかさ]
-    { 
-        prompt: "固い - 柔らかな", 
-        name: "soft",     
-        labels: ["固い", "1", "2", "3", "4", "5", "6", "7", "8", "9", "柔らかな"] 
-    },
-    { 
-        prompt: "緊張した - ゆるんだ", 
-        name: "loose", 
-        labels: ["緊張した", "1", "2", "3", "4", "5", "6", "7", "8", "9", "ゆるんだ"] 
-    }
+    { prompt: "固い - 柔らかな", name: "soft",  labels: create_labels("固い", "柔らかな") },
+    { prompt: "緊張した - ゆるんだ", name: "loose", labels: create_labels("緊張した", "ゆるんだ") }
 ];
 // 通常項目の順序をシャッフルして固定
 const sd_scale_fixed = jsPsych.randomization.shuffle(sd_scale_source);
 
 // ★修正: 感情・不協和測定用尺度 (8項目)
-// 日本語訳を当て、7段階で測定します。
-const manipulation_check_source = [
-    // Positive
-    { prompt: "幸せな", name: "happy", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
-    { prompt: "気分が良い", name: "good_mood", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
-    { prompt: "楽観的な", name: "optimistic", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
-    { prompt: "親しみを感じる", name: "friendly", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
-    { prompt: "活気に満ちた", name: "energetic", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
-    
-    // Negative (Dissonance)
-    { prompt: "居心地が悪い", name: "uncomfortable", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
-    { prompt: "落ち着かない", name: "uneasy", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] },
-    { prompt: "煩わしい", name: "bothered", labels: ["全く当てはまらない", "2", "3", "4", "5", "6", "非常によく当てはまる"] }
+// 操作チェック（感情指標）
+// ここは7段階(0-6)ですが、同様に両端に意味をつけます
+const manip_labels = [
+    "0<br><span style='font-size:0.8em'>全く<br>当てはまらない</span>", 
+    "1", "2", "3", "4", "5", 
+    "6<br><span style='font-size:0.8em'>非常に<br>よく当てはまる</span>"
 ];
-// 順序効果を防ぐためシャッフル
-const manipulation_check_scale = jsPsych.randomization.shuffle(manipulation_check_source);
+// 日本語訳を当て、7段階で測定します。
+const manipulation_check_scale = [
+    { prompt: "先ほどの文章作成課題を行っている時、「書きにくい」「不快だ」といった葛藤を感じましたか？", 
+      name: "discomfort", 
+      labels: manip_labels }
+];
 
-// ★追加: 混入させるアテンションチェック項目
+// アテンションチェック項目
 const attention_check_item = {
-    // 目立つように色を変えるか、あるいは自然にするかは研究意図次第ですが、
-    // ここでは「指示に従うか」を見るため、太字で指示します。
-    prompt: "<span font-weight:bold;'>【確認】この項目では一番左（1の左隣）を選んでください</span>",
+    prompt: "<span style='color:#d9534f; font-weight:bold;'>【確認】この項目では「0」（一番左）を選んでください</span>",
     name: "attention_check",
-    labels: ["これを選択", "1", "2", "3", "4", "5", "6", "7", "8", "9", "不可"]
+    // ここも同じフォーマットで揃えます
+    labels: create_labels("これを選択", "不可")
 };
 
 let TARGET_DATA = { id: null, path: null, score: 100 };
@@ -290,6 +260,14 @@ const pre_evaluation_loop = {
         scale_width: 800,
         on_finish: function(data) {
             const res = data.response;
+            // ★修正: データを1つずつ取り出して個別の列に保存
+            // ★修正: 固定リスト(sd_keys)の順番通りにデータを保存
+            // 該当する回答がない場合（チェック項目が無い回など）は空欄または無視されます
+            sd_keys.forEach(key => {
+                if(res[key] !== undefined) {
+                    data[key] = res[key];
+                }
+            });
             // 通常項目の合計スコアを計算（チェック項目は無視）
             let sum = (res.beauty||0) + (res.like||0) + (res.good||0) + (res.interest||0);
             
@@ -380,9 +358,29 @@ timeline.push({
 const manip_check = {
     timeline: [{
         type: jsPsychSurveyLikert,
-        preamble: '今の課題についてお伺いします。',
-        questions: manipulation_check_scale,
-        on_finish: function(data) { data.phase = 'manipulation_check'; }
+        preamble: '<div style="margin: 20px 0;"><h3>現在の気分について</h3><p>今のあなたの気分として、以下の項目がどの程度当てはまるかお答えください。</p></div>',
+        questions: [
+            { prompt: "幸せな", name: "happy", labels: manip_labels },
+            { prompt: "気分が良い", name: "good_mood", labels: manip_labels },
+            { prompt: "楽観的な", name: "optimistic", labels: manip_labels },
+            { prompt: "親しみを感じる", name: "friendly", labels: manip_labels },
+            { prompt: "活気に満ちた", name: "energetic", labels: manip_labels },
+            { prompt: "居心地が悪い", name: "uncomfortable", labels: manip_labels },
+            { prompt: "落ち着かない", name: "uneasy", labels: manip_labels },
+            { prompt: "煩わしい", name: "bothered", labels: manip_labels }
+        ],
+        scale_width: 800,
+        randomize_question_order: true, 
+        on_finish: function(data) { 
+            data.phase = 'manipulation_check';
+            const res = data.response;
+            // ★修正: 固定リスト(manip_keys)の順序で保存
+            manip_keys.forEach(key => {
+                if(res[key] !== undefined) {
+                    data[key] = res[key];
+                }
+            });
+        }
     }],
    // conditional_function: function() { return CONDITION !== 'C'; }
 };
@@ -430,6 +428,12 @@ const post_evaluation_loop = {
         scale_width: 800,
         on_finish: function(data) {
             const res = data.response;
+            // ★修正: 固定リスト(sd_keys)の順番通りにデータを保存
+            sd_keys.forEach(key => {
+                if(res[key] !== undefined) {
+                    data[key] = res[key];
+                }
+            });
             let sum = (res.beauty||0) + (res.like||0) + (res.good||0) + (res.interest||0);
             
             data.phase = 'post'; 
