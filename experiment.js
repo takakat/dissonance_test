@@ -68,6 +68,9 @@ const sd_scale_source = [
     { prompt: "固い - 柔らかな", name: "soft",  labels: create_labels("固い", "柔らかな") },
     { prompt: "緊張した - ゆるんだ", name: "loose", labels: create_labels("緊張した", "ゆるんだ") }
 ];
+
+// ★修正: 全項目を必須入力(required: true)にする
+sd_scale_source.forEach(q => q.required = true);
 // 通常項目の順序をシャッフルして固定
 const sd_scale_fixed = jsPsych.randomization.shuffle(sd_scale_source);
 
@@ -91,7 +94,8 @@ const attention_check_item = {
     prompt: "<span style='color:#d9534f; font-weight:bold;'>【確認】この項目では「0」（一番左）を選んでください</span>",
     name: "attention_check",
     // ここも同じフォーマットで揃えます
-    labels: create_labels("これを選択", "不可")
+    labels: create_labels("これを選択", "不可"),
+    required: true
 };
 
 let TARGET_DATA = { id: null, path: null, score: 100 };
@@ -314,42 +318,103 @@ timeline.push({
 // ※ここも画像を見ながら行うため、上下固定レイアウトを適用します
 timeline.push({
     type: jsPsychSurveyText,
-    css_classes: ['sticky-top-layout'], // 画像固定クラス適用
+    css_classes: ['sticky-top-layout'], 
     
     preamble: function() {
         let html = `<div>`;
+        
+        // 条件C以外は画像を表示
         if (CONDITION !== 'C') {
-            // C群以外はターゲット画像を表示
             html += `<img src="${TARGET_DATA.path}" class="fixed-img"><br>`;
         } else {
-            // C群は画像なし（またはダミー）
             html += `<div style="height:50px;"></div>`; 
         }
         
         html += `<div style="text-align:left; max-width:800px; margin:20px auto;">`;
         html += `<h3>記述課題</h3>`;
+
+        // ★追加: 文字数制限の注意書き
+        html += `<p style="font-weight:bold; color:#d9534f; border: 1px solid #d9534f; padding: 10px; background: #fff0f0;">
+                 ※この課題では、最低150文字以上の記述が必要です。<br>
+                 文字数が150文字を超えるまで「送信して次へ」ボタンは押せません。
+                 </p>`;
         
-        if (CONDITION === 'A') { 
-            html += `<p style="color:#0056b3; font-weight:bold;">この作品の「良い点・魅力的な点」を3つ挙げ、<br>友人に推薦する文章を書いてください。</p>`;
-            html += `<p style="font-size:0.9em;">※自分がこの作品をとても気に入っているつもりで書いてください。</p>`;
+        if (CONDITION === 'A') { // 実験群(CAA)
+            html += `<p style="color:#0056b3; font-weight:bold;">
+                「この作品の魅力や、他者に推薦できる優れた点」についての推薦文を作成していただきます。
+                </p>`;
+            html += `<p>
+                以下の入力欄に、この絵画を肯定的に評価し、他者に推薦するためのユニークな論点を最低3つ挙げ、それぞれについて具体的に説明してください。
+                </p>`;
         } 
-        else if (CONDITION === 'B') { 
-            html += `<p style="color:#333; font-weight:bold;">この作品の「色使い・構図・描かれている対象」について、<br>客観的に解説する文章を書いてください。</p>`;
-            html += `<p style="font-size:0.9em;">※個人的な感情は入れず、事実のみを記述してください。</p>`;
+        else if (CONDITION === 'B') { // 統制群(客観記述)
+            html += `<p style="color:#333; font-weight:bold;">
+                あなたの個人的な感想や「良い・悪い」といった評価は含めず、「作品の構成要素」を客観的に記述してください。
+                </p>`;
+            html += `<p>
+                描かれている人物や物、色彩の配置、筆のタッチなど、目に見える事実に基づいた客観的な特徴を3つ以上取り上げて説明してください。
+                </p>`;
         } 
-        else { 
+        else { // 無関係統制群(C) - 想起課題
             html += `<div style="background:#f9f9f9; padding:15px; border:1px solid #ddd;">
-                <p><strong>課題用テキスト:</strong></p>
-                <p>近年、人工知能（AI）技術の急速な発展により、私たちの生活様式は大きく変化しています。特に生成AIの登場は、文章作成や画像生成といったクリエイティブな領域にも影響を与えており、教育現場やビジネスシーンでの活用議論が活発化しています。</p>
+                <p><strong>課題:</strong></p>
+                <p>今まで見た中で一番印象に残っている絵画について思い浮かべてください。それはどのような絵画か、またなぜ印象に残っているのかを具体的に記述してください。</p>
             </div>`;
-            html += `<p style="font-weight:bold;">上記の文章を読み、内容を要約してください。</p>`;
         }
         html += `</div></div>`;
         return html;
     },
-    questions: [{ prompt: "", rows: 6, columns: 60, required: true, name: 'essay' }],
-    button_label: '送信して次へ',
-    on_finish: function(data) { data.phase = 'intervention'; }
+    
+    // 入力欄（少し広めにしています）
+    questions: [{ prompt: "", rows: 10, columns: 80, required: true, name: 'essay' }],
+    button_label: '送信して次へ（150文字以上で有効化）',
+
+    // ★追加: 文字数カウントとボタン制御のロジック
+    on_load: function() {
+        const textarea = document.querySelector('textarea');
+        const button = document.getElementById('jspsych-survey-text-next');
+        
+        const counterDiv = document.createElement('div');
+        counterDiv.style.marginTop = "10px";
+        counterDiv.style.fontWeight = "bold";
+        counterDiv.style.textAlign = "right";
+        counterDiv.innerHTML = "現在の文字数: <span id='char-count' style='color:red; font-size:1.2em;'>0</span> / 150文字 (空白除く)";
+        
+        textarea.parentElement.appendChild(counterDiv);
+
+        button.disabled = true;
+        button.style.opacity = "0.5";
+        button.style.cursor = "not-allowed";
+
+        textarea.addEventListener('input', function() {
+            // ★ここがポイント: 正規表現 /\s+/g で空白文字(スペース,改行,タブ)を全て削除
+            const textWithoutSpace = this.value.replace(/\s+/g, '');
+            const currentLength = textWithoutSpace.length;
+            
+            const countSpan = document.getElementById('char-count');
+            countSpan.textContent = currentLength;
+
+            if (currentLength >= 150) {
+                button.disabled = false;
+                button.style.opacity = "1";
+                button.style.cursor = "pointer";
+                countSpan.style.color = "green";
+                button.value = "送信して次へ"; 
+            } else {
+                button.disabled = true;
+                button.style.opacity = "0.5";
+                button.style.cursor = "not-allowed";
+                countSpan.style.color = "red";
+                button.value = `あと ${150 - currentLength} 文字必要です`;
+            }
+        });
+    },
+
+    on_finish: function(data) { 
+        data.phase = 'intervention'; 
+        // 念のため文字数もデータとして保存
+        data.char_count = data.response.essay.length;
+    }
 });
 
 // ---------------------------------------------------------
@@ -360,14 +425,14 @@ const manip_check = {
         type: jsPsychSurveyLikert,
         preamble: '<div style="margin: 20px 0;"><h3>現在の気分について</h3><p>今のあなたの気分として、以下の項目がどの程度当てはまるかお答えください。</p></div>',
         questions: [
-            { prompt: "幸せな", name: "happy", labels: manip_labels },
-            { prompt: "気分が良い", name: "good_mood", labels: manip_labels },
-            { prompt: "楽観的な", name: "optimistic", labels: manip_labels },
-            { prompt: "親しみを感じる", name: "friendly", labels: manip_labels },
-            { prompt: "活気に満ちた", name: "energetic", labels: manip_labels },
-            { prompt: "居心地が悪い", name: "uncomfortable", labels: manip_labels },
-            { prompt: "落ち着かない", name: "uneasy", labels: manip_labels },
-            { prompt: "煩わしい", name: "bothered", labels: manip_labels }
+            { prompt: "幸せな", name: "happy", labels: manip_labels, required: true },
+            { prompt: "気分が良い", name: "good_mood", labels: manip_labels, required: true },
+            { prompt: "楽観的な", name: "optimistic", labels: manip_labels, required: true },
+            { prompt: "親しみを感じる", name: "friendly", labels: manip_labels, required: true },
+            { prompt: "活気に満ちた", name: "energetic", labels: manip_labels, required: true },
+            { prompt: "居心地が悪い", name: "uncomfortable", labels: manip_labels, required: true },
+            { prompt: "落ち着かない", name: "uneasy", labels: manip_labels, required: true },
+            { prompt: "煩わしい", name: "bothered", labels: manip_labels, required: true }
         ],
         scale_width: 800,
         randomize_question_order: true, 
