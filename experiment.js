@@ -157,34 +157,69 @@ timeline.push({
 
 // ★後でここに同意文をコピペしてください
 const consent_text_content = `
-    <p><strong>研究参加への同意</strong></p>
-    <p>本研究は、言語表現と思考プロセスに関する心理学的実験です。</p>
-    <p><strong>【実験の手順】</strong><br>
-    画面の指示に従い、画像の評価や文章の作成を行っていただきます。<br>
-    </p>
-    <p><strong>【匿名性の保持】</strong><br>
-    収集されたデータは統計的に処理され、個人が特定されることはありません。</p>
-    <p><strong>【参加の自由】</strong><br>
-    本実験への参加は任意です。実験途中であっても、ブラウザを閉じることでいつでも不利益なく参加を中止できます。</p>
-    <p>ここに説明文</p>
+    <div style="text-align: left; font-size: 0.95em; line-height: 1.6;">
+        <h3 style="text-align:center;">研究協力のお願い（説明文書）</h3>
+        
+        <p><strong>1. 研究の目的</strong><br>
+        本研究は、「芸術作品に対する言語表現」と「一般的な言語表現」の思考プロセスを比較・調査することを
+        目的としています。人々が絵画のような複雑な視覚情報から受けた印象をどのように言葉にするのか、また、
+        そのプロセスが一般的なテキスト情報（文章）記述するプロセスとどのように異なるのかを分析します。</p>
+
+        <p><strong>2. 研究の方法</strong><br>
+        この実験では、まず複数の絵画（15～20枚）が提示されますので、それぞれの作品に対するあなたの印象を、いくつかの評価尺度（SD法）を用いてお答えいただきます。次に、文章を作成する課題に取り組んでいただきます。課題はランダムに割り当てられます。一部の方は、先ほど評価した作品の中から1枚が選ばれ、その作品について記述していただきます。それ以外の方は、作品とは無関係な一般的な文章を記述していただきます。課題の直後には、課題中のご自身の状態について（例：集中度など）の短いアンケートにお答えいただきます。最後に、実験の最初と同じの作品の中から5～10枚をランダムな順序で再度提示しますので、作品に対する印象を再度評価していただきます。<br>
+        所要時間は約45分です。</p>
+
+        <p><strong>3. 参加の任意性と撤回の自由</strong><br>
+        本研究への参加はあなたの自由意志によるものです。参加を断っても不利益を被ることはありません。<br>
+        また、実験の途中であっても、ブラウザを閉じることでいつでも参加を取りやめる（同意を撤回する）ことができます。<br>
+        その場合、入力されたデータは破棄され、研究に使用されることはありません。</p>
+
+        <p><strong>4. 個人情報の保護（匿名性）</strong><br>
+        本研究では、個人を特定できる情報（氏名、住所など）は一切収集しません。<br>
+        収集されたデータは統計的に処理され、学術目的（学会発表、論文投稿など）でのみ使用されます。</p>
+
+        <p><strong>5. 予想される利益と不利益</strong><br>
+        実験による身体的・精神的な危険や不利益は想定されていませんが、作業中に疲労等を感じた場合は直ちに中止してください。</p>
+
+
+        <p><strong>7. 問い合わせ先</strong><br>
+        京都工芸繊維大学工芸科学部設計工学域情報工学課程ブレインサイエンス研究室<br>
+        研究責任者：梶村昇吾<br>
+        研究担当者: 藤井貴久<br>
+        連絡先: b2122051@edu.kit.ac.jp</p>
+        
+        <hr>
+        <p style="font-weight:bold;">
+            上記の説明内容をよく読み、理解した上で、本研究に参加することに同意いただける場合は、<br>
+            本日の日付を入力し、チェックボックスにチェックを入れてください。
+        </p>
+    </div>
 `;
 
 const consent_trial = {
     type: jsPsychHtmlButtonResponse,
     stimulus: function() {
+        // 今日の日付を YYYY-MM-DD 形式で取得 (デフォルト値用)
+        const today = new Date().toISOString().split('T')[0];
+        
         return `
             <div class="instruction-text" style="max-width: 800px; margin: 0 auto;">
-                <h3>実験参加への同意</h3>
-                
-                <div style="border: 1px solid #ccc; padding: 20px; height: 300px; overflow-y: scroll; background: #fff; text-align: left; margin-bottom: 20px; border-radius: 4px;">
+                <div style="border: 1px solid #ccc; padding: 20px; height: 400px; overflow-y: scroll; background: #fff; text-align: left; margin-bottom: 20px; border-radius: 4px;">
                     ${consent_text_content}
                 </div>
+                
+                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #eee;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold; margin-right: 10px;">同意日:</label>
+                        <input type="date" id="consent_date" value="${today}" style="padding: 5px; font-size: 1em;">
+                    </div>
 
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <label style="font-size: 1.2em; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
-                        <input type="checkbox" id="consent_checkbox" style="transform: scale(1.5);">
-                        <span>上記の内容を理解し、実験参加に同意します。</span>
-                    </label>
+                    <div style="text-align: center;">
+                        <label style="font-size: 1.2em; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                            <input type="checkbox" id="consent_checkbox" style="transform: scale(1.5);">
+                            <span>上記の内容を理解し、実験参加に同意します。</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         `;
@@ -412,8 +447,9 @@ timeline.push({
 
     on_finish: function(data) { 
         data.phase = 'intervention'; 
-        // 念のため文字数もデータとして保存
-        data.char_count = data.response.essay.length;
+        data.essay = data.response.essay;
+        // 保存データにも「空白抜きの文字数」を記録しておくと便利です
+        data.char_count = data.essay.replace(/\s+/g, '').length;
     }
 });
 
