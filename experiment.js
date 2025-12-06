@@ -122,11 +122,16 @@ const attention_check_item = {
 let TARGET_DATA = { id: null, path: null, score: 100 };
 let CONDITION = null; 
 
+// ★追加: 事後評価用の画像リスト（下位10枚）を入れる変数
+let post_stimuli_data = [];
+let current_post_index = 0;
+
 // ★アテンションチェックを入れる対象の画像をランダムに決定
 // 事前・事後それぞれで1枚ずつ選ぶ
+// ★アテンションチェックを入れる対象の画像をランダムに決定
 const pre_check_target_id = jsPsych.randomization.sampleWithoutReplacement(stimuli_data.map(s => s.id), 1)[0];
-const post_check_target_id = jsPsych.randomization.sampleWithoutReplacement(stimuli_data.map(s => s.id), 1)[0];
 
+let post_check_target_id = jsPsych.randomization.sampleWithoutReplacement(stimuli_data.map(s => s.id), 1)[0];
 console.log(`Pre-check target: ${pre_check_target_id}`);
 console.log(`Post-check target: ${post_check_target_id}`);
 
@@ -353,17 +358,38 @@ timeline.push(pre_evaluation_loop);
 // ---------------------------------------------------------
 timeline.push({
     type: jsPsychHtmlKeyboardResponse,
-    stimulus: 'データ保存中...',
+    stimulus: 'データ集計中...',
     trial_duration: 500,
     on_finish: function() {
         const all_data = jsPsych.data.get().filter({phase: 'pre'}).values();
         all_data.sort((a, b) => a.eval_score - b.eval_score);
         
         if(all_data.length > 0){
+            // 1. 介入対象 (最下位)
             TARGET_DATA.id = all_data[0].img_id;
             TARGET_DATA.path = all_data[0].img_path;
             TARGET_DATA.score = all_data[0].eval_score;
             jsPsych.data.addProperties({ target_id: TARGET_DATA.id });
+
+            // 2. 再評価用リスト (下位10枚)
+            const slice_count = Math.min(10, all_data.length);
+            const low_10_data = all_data.slice(0, slice_count);
+            
+            // ★ここでリストを作成し、シャッフルまで完了させておく
+            let temp_list = low_10_data.map(d => {
+                return { id: d.img_id, path: d.img_path };
+            });
+            post_stimuli_data = jsPsych.randomization.shuffle(temp_list);
+
+            // 3. アテンションチェック対象の再抽選
+            // (シャッフルされた post_stimuli_data から1つ選ぶ)
+            const new_check_id = jsPsych.randomization.sampleWithoutReplacement(post_stimuli_data.map(s => s.id), 1)[0];
+            post_check_target_id = new_check_id;
+            
+            // ★カウンターをリセット
+            current_post_index = 0;
+
+            console.log("再評価リスト(決定済):", post_stimuli_data);
         }
     }
 });
@@ -509,7 +535,7 @@ const manip_check = {
 timeline.push(manip_check);
 
 // ---------------------------------------------------------
-// 7. Phase 4: 事後評価
+// 7. Phase 4: 事後評価 (マニュアルループ版)
 // ---------------------------------------------------------
 timeline.push({
     type: jsPsychHtmlKeyboardResponse,
@@ -523,55 +549,76 @@ timeline.push({
     `
 });
 
-const post_evaluation_loop = {
-    timeline: [{
-        type: jsPsychSurveyLikert,
-        css_classes: ['sticky-top-layout'],
+// ★単一の試行定義（変数はカウンターを使って動的に取得）
+const post_trial = {
+    type: jsPsychSurveyLikert,
+    css_classes: ['sticky-top-layout'],
+    
+    // 画像パス: 配列から現在のインデックスのものを取り出す
+    preamble: function() {
+        // 安全策: データが無い場合はエラー回避
+        if (!post_stimuli_data[current_post_index]) return "";
         
-        preamble: function() {
-            const p = jsPsych.evaluateTimelineVariable('path');
-            return `<img src="${p}" class="fixed-img">`;
-        },
-        
-        // ★事後も同様に動的に質問を生成
-        questions: function() {
-            const current_id = jsPsych.evaluateTimelineVariable('id');
-            let current_questions = [...sd_scale_fixed]; // コピー
+        const path = post_stimuli_data[current_post_index].path;
+        return `<img src="${path}" class="fixed-img">`;
+    },
+    
+    // 質問生成: ここもインデックスを使って判定
+    questions: function() {
+        if (!post_stimuli_data[current_post_index]) return [];
 
-            // 事後チェック対象の画像なら、チェック項目を混ぜる
-            if (current_id === post_check_target_id) {
-                const insert_index = Math.floor(Math.random() * (current_questions.length + 1));
-                current_questions.splice(insert_index, 0, attention_check_item);
-            }
-            
-            return current_questions;
-        },
-        
-        scale_width: 800,
-        on_finish: function(data) {
-            const res = data.response;
-            // ★修正: 固定リスト(sd_keys)の順番通りにデータを保存
-            sd_keys.forEach(key => {
-                if(res[key] !== undefined) {
-                    data[key] = res[key];
-                }
-            });
-            let sum = (res.beauty||0) + (res.like||0) + (res.good||0) + (res.interest||0);
-            
-            data.phase = 'post'; 
-            data.eval_score = sum / 4;
-            data.img_id = jsPsych.evaluateTimelineVariable('id');
-            data.is_target = (data.img_id === TARGET_DATA.id);
-            
-            // 事後チェック項目の正誤記録
-            if (res.attention_check !== undefined) {
-                data.passed_check = (res.attention_check === 0);
-            }
+        const current_id = post_stimuli_data[current_post_index].id;
+        let current_questions = [...sd_scale_fixed]; 
+
+        // アテンションチェック挿入ロジック
+        if (current_id === post_check_target_id) {
+            const insert_index = Math.floor(Math.random() * (current_questions.length + 1));
+            current_questions.splice(insert_index, 0, attention_check_item);
         }
-    }],
-    timeline_variables: stimuli_data, 
-    randomize_order: true
+        return current_questions;
+    },
+    
+    scale_width: 800,
+    
+    on_finish: function(data) {
+        // 現在のデータIDを取得して保存
+        const current_item = post_stimuli_data[current_post_index];
+        
+        const res = data.response;
+        sd_keys.forEach(key => {
+            if(res[key] !== undefined) {
+                data[key] = res[key];
+            }
+        });
+        let sum = (res.beauty||0) + (res.like||0) + (res.good||0) + (res.interest||0);
+        
+        data.phase = 'post'; 
+        data.eval_score = sum / 4;
+        data.img_id = current_item.id;
+        data.is_target = (current_item.id === TARGET_DATA.id);
+        
+        if (res.attention_check !== undefined) {
+            data.passed_check = (res.attention_check === 0);
+        }
+
+        // ★★★重要: ここでカウンターを1つ進める★★★
+        current_post_index++;
+    }
 };
+
+// ★ループ定義
+const post_evaluation_loop = {
+    timeline: [post_trial],
+    // カウンターがデータの個数より小さい間、繰り返す
+    loop_function: function() {
+        if (current_post_index < post_stimuli_data.length) {
+            return true; // 繰り返す
+        } else {
+            return false; // 終了
+        }
+    }
+};
+
 timeline.push(post_evaluation_loop);
 
 // ---------------------------------------------------------
